@@ -1,0 +1,77 @@
+openapi: 3.1.0
+info:
+  title: Solitaire Matchmaking API
+  version: 0.1.0
+  description: Implemented foundation endpoints. Business endpoints remain planned.
+servers:
+  - url: http://127.0.0.1:8080
+paths:
+  /healthz:
+    get:
+      operationId: getLiveness
+      responses:
+        "200":
+          description: Process is alive.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Status"
+  /readyz:
+    get:
+      operationId: getReadiness
+      responses:
+        "200":
+          description: Service and PostgreSQL are ready.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Status"
+        "503":
+          description: Service is draining or PostgreSQL is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Status"
+  /v1/capabilities:
+    get:
+      operationId: getCapabilities
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Implemented and planned capabilities.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Capabilities"
+        "401":
+          description: Authentication failed.
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+  schemas:
+    Status:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+    Capabilities:
+      type: object
+      required: [service, stage, rating_enabled, matchmaking_enabled, planned_room_sizes]
+      properties:
+        service:
+          const: solitaire-matchmaking
+        stage:
+          const: foundation
+        rating_enabled:
+          const: false
+        matchmaking_enabled:
+          const: false
+        planned_room_sizes:
+          type: array
+          items:
+            type: integer
+            enum: [5, 6, 7]
