@@ -1,11 +1,18 @@
-// Package rating defines portable skill-rating data. Rating algorithms are added
-// in the next stage; this package does not currently update or predict ratings.
+// Package rating defines portable skill-rating data and versioned rating models.
 package rating
 
 import (
 	"errors"
+	"fmt"
 	"math"
 	"time"
+)
+
+const (
+	// MinRoomSize is the smallest supported competitive room.
+	MinRoomSize = 5
+	// MaxRoomSize is the largest supported competitive room.
+	MaxRoomSize = 7
 )
 
 // Estimate separates uncertainty about skill from observed performance variation.
@@ -64,6 +71,40 @@ type MatchResult struct {
 	FinishedAt          time.Time           `json:"finished_at"`
 	AvailableAt         time.Time           `json:"available_at"`
 	Participants        []ParticipantResult `json:"participants"`
+}
+
+// Validate ensures an outcome is complete enough to be replayed by a rating
+// model. ScoringRulesVersion remains responsible for the meaning of ties.
+func (r MatchResult) Validate() error {
+	if r.EventID == "" || r.RoomID == "" || r.ModeID == "" || r.DeckID == "" || r.ScoringRulesVersion == "" {
+		return errors.New("rating result identifiers and scoring rules version are required")
+	}
+	if r.FinishedAt.IsZero() || r.AvailableAt.IsZero() || r.AvailableAt.Before(r.FinishedAt) {
+		return errors.New("rating result requires valid finish and availability times")
+	}
+	if len(r.Participants) < MinRoomSize || len(r.Participants) > MaxRoomSize {
+		return fmt.Errorf("rating result requires %d to %d participants", MinRoomSize, MaxRoomSize)
+	}
+
+	players := make(map[string]struct{}, len(r.Participants))
+	hasWinner := false
+	for _, participant := range r.Participants {
+		if participant.PlayerID == "" {
+			return errors.New("rating result participant player id is required")
+		}
+		if _, exists := players[participant.PlayerID]; exists {
+			return fmt.Errorf("rating result contains duplicate player %q", participant.PlayerID)
+		}
+		players[participant.PlayerID] = struct{}{}
+		if participant.Place < 1 || participant.Place > len(r.Participants) {
+			return fmt.Errorf("rating result place for player %q is outside the room", participant.PlayerID)
+		}
+		hasWinner = hasWinner || participant.Place == 1
+	}
+	if !hasWinner {
+		return errors.New("rating result requires at least one first-place participant")
+	}
+	return nil
 }
 
 func finite(value float64) bool {
