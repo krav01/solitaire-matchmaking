@@ -23,6 +23,7 @@ type Policy struct {
 	FillTimeout             time.Duration
 	AgePriorityAfter        time.Duration
 	CandidateLimit          int
+	RoomLimit               int
 	PreferNearlyFull        bool
 }
 
@@ -40,8 +41,8 @@ func (p Policy) Validate() error {
 	if p.FillTimeout <= 0 || p.ExpansionInterval <= 0 || p.ExpansionInterval > p.FillTimeout {
 		return errors.New("expansion interval must be positive and no longer than fill timeout")
 	}
-	if p.AgePriorityAfter < 0 || p.AgePriorityAfter > p.FillTimeout || p.CandidateLimit <= 0 {
-		return errors.New("invalid age priority or candidate limit")
+	if p.AgePriorityAfter < 0 || p.AgePriorityAfter > p.FillTimeout || p.CandidateLimit <= 0 || p.RoomLimit <= 0 {
+		return errors.New("invalid age priority or scan limit")
 	}
 	return nil
 }

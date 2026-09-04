@@ -23,7 +23,7 @@
 
 - [x] eligibility filtering and whole-room fairness validation
 - [x] bounded skill-window expansion and waiting-age priority
-- [ ] preference for completing nearly full eligible rooms
+- [x] preference for completing nearly full eligible rooms
 - [ ] event-driven selection plus periodic retry boundary
 - [ ] reproducible arrivals, skills, outcomes and tournament partition simulation
 - [ ] joint reports for fill latency, timeout rate and fairness

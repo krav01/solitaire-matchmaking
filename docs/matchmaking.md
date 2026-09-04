@@ -28,6 +28,19 @@ rooms are ordered oldest first, while the relative order of young rooms is kept
 for the later fill-speed ranking. This prevents starvation without allowing an
 old room to bypass candidate eligibility or hard fairness limits.
 
+## Room selection
+
+`SelectRoom` evaluates one candidate against a bounded set of rooms from the same
+mode, capacity and immutable policy. Ineligible rooms are removed before ranking.
+Rooms beyond `AgePriorityAfter` come first and are ordered oldest-first. Among
+young rooms, `PreferNearlyFull` selects the room with the most existing members,
+then the smaller whole-room skill gap. Stable input order is retained when the
+preference is disabled.
+
+The selector returns a decision only; persistence must still claim the ticket
+and room atomically. `RoomLimit` bounds evaluation work independently from the
+per-room `CandidateLimit`.
+
 ## Integration boundary
 
 `Evaluator` depends on the small `PlacementPredictor` interface. The baseline

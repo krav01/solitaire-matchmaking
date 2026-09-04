@@ -183,6 +183,7 @@ func testRoom(createdAt time.Time, capacity int, means []float64) matchmaking.Ro
 			FillTimeout:             30 * time.Second,
 			AgePriorityAfter:        15 * time.Second,
 			CandidateLimit:          100,
+			RoomLimit:               100,
 			PreferNearlyFull:        true,
 		},
 		Members: make([]matchmaking.Candidate, len(means)),

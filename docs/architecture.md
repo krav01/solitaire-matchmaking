@@ -33,8 +33,8 @@ room completion benefit and waiting age.
 
 The policy supports an initial skill window, bounded expansion, a maximum skill
 gap, a maximum spread between predicted win probabilities, fill timeout, age
-priority and candidate scan limit. Thresholds remain unset until simulation and
-available production data support them.
+priority, and separate candidate and room scan limits. Thresholds remain unset
+until simulation and available production data support them.
 
 Prefer completing a nearly full room when choices remain within the same hard
 fairness boundary. Age priority prevents an older room from waiting forever.

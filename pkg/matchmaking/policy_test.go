@@ -14,7 +14,7 @@ func TestPolicyValidate(t *testing.T) {
 		Version: "matching-v1", RatingModelVersion: "rating-v1",
 		InitialSkillGap: 2, MaxSkillGap: 5, MaxWinProbabilitySpread: 0.1,
 		ExpansionInterval: 5 * time.Second, FillTimeout: 30 * time.Second,
-		AgePriorityAfter: 15 * time.Second, CandidateLimit: 100, PreferNearlyFull: true,
+		AgePriorityAfter: 15 * time.Second, CandidateLimit: 100, RoomLimit: 100, PreferNearlyFull: true,
 	}
 	tests := []struct {
 		name    string
@@ -29,6 +29,7 @@ func TestPolicyValidate(t *testing.T) {
 		{name: "expansion after timeout", change: func(p *matchmaking.Policy) { p.ExpansionInterval = time.Minute }, wantErr: true},
 		{name: "age priority after timeout", change: func(p *matchmaking.Policy) { p.AgePriorityAfter = time.Minute }, wantErr: true},
 		{name: "empty candidate window", change: func(p *matchmaking.Policy) { p.CandidateLimit = 0 }, wantErr: true},
+		{name: "empty room window", change: func(p *matchmaking.Policy) { p.RoomLimit = 0 }, wantErr: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
