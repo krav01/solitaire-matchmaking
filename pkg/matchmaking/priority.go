@@ -49,8 +49,8 @@ func PrioritizeWaitingRooms(rooms []RoomView, evaluatedAt time.Time) ([]RoomView
 	}
 
 	slices.SortStableFunc(ordered, func(left, right RoomView) int {
-		leftPrioritized := evaluatedAt.Sub(left.CreatedAt) >= left.Policy.AgePriorityAfter
-		rightPrioritized := evaluatedAt.Sub(right.CreatedAt) >= right.Policy.AgePriorityAfter
+		leftPrioritized := roomAgePrioritized(left, evaluatedAt)
+		rightPrioritized := roomAgePrioritized(right, evaluatedAt)
 		if leftPrioritized != rightPrioritized {
 			if leftPrioritized {
 				return -1
@@ -69,4 +69,8 @@ func PrioritizeWaitingRooms(rooms []RoomView, evaluatedAt time.Time) ([]RoomView
 		return 0
 	})
 	return ordered, nil
+}
+
+func roomAgePrioritized(room RoomView, evaluatedAt time.Time) bool {
+	return evaluatedAt.Sub(room.CreatedAt) >= room.Policy.AgePriorityAfter
 }
