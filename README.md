@@ -7,10 +7,11 @@ six or seven players while balancing two measurable goals:
 - similar predicted chances of winning;
 - short, consistently measured room fill times.
 
-The foundation implements process configuration, PostgreSQL connectivity,
-liveness, readiness and an authenticated capability endpoint. Rating updates,
-candidate selection and tournament persistence are explicit later stages; the
-service does not pretend that placeholder algorithms are production features.
+The current stage implements a versioned baseline rating model, bounded fair
+room selection, deterministic retry decisions and reproducible simulation
+workloads. The service process foundation provides configuration, PostgreSQL
+connectivity, liveness, readiness and an authenticated capability endpoint.
+Transactional tournament persistence remains a later stage.
 
 ## Architecture
 

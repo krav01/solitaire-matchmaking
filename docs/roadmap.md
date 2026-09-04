@@ -25,7 +25,7 @@
 - [x] bounded skill-window expansion and waiting-age priority
 - [x] preference for completing nearly full eligible rooms
 - [x] event-driven selection plus periodic retry boundary
-- [ ] reproducible arrivals, skills, outcomes and tournament partition simulation
+- [x] reproducible arrivals, skills, outcomes and tournament partition simulation
 - [ ] joint reports for fill latency, timeout rate and fairness
 
 ## Stage 4 — Transactional tournament lifecycle
