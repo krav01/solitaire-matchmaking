@@ -26,7 +26,7 @@
 - [x] preference for completing nearly full eligible rooms
 - [x] event-driven selection plus periodic retry boundary
 - [x] reproducible arrivals, skills, outcomes and tournament partition simulation
-- [ ] joint reports for fill latency, timeout rate and fairness
+- [x] joint reports for fill latency, timeout rate and fairness
 
 ## Stage 4 — Transactional tournament lifecycle
 

@@ -9,9 +9,10 @@ six or seven players while balancing two measurable goals:
 
 The current stage implements a versioned baseline rating model, bounded fair
 room selection, deterministic retry decisions and reproducible simulation
-workloads. The service process foundation provides configuration, PostgreSQL
-connectivity, liveness, readiness and an authenticated capability endpoint.
-Transactional tournament persistence remains a later stage.
+workloads with joint speed, timeout and fairness reports. The service process
+foundation provides configuration, PostgreSQL connectivity, liveness, readiness
+and an authenticated capability endpoint. Transactional tournament persistence
+remains a later stage.
 
 ## Architecture
 
