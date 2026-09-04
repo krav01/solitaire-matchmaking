@@ -26,12 +26,34 @@ the model from becoming unrealistically certain.
   processing time.
 - Participant input order does not affect the generated updates.
 
+## Pre-game prediction
+
+The model converts the room's Gaussian estimates into positive player weights.
+A shared scale combines the room's skill uncertainty and performance deviation,
+so greater uncertainty moves predictions toward equal chances without treating
+uncertainty as lower skill.
+
+An exact Plackett-Luce dynamic program evaluates every reachable selection state
+for the room. It returns one probability per place for every player, the
+first-place probability and the expected place. For each player the place
+probabilities sum to one, and for each place the probabilities across the room
+also sum to one. Equal players therefore receive `1/N` for every place.
+
+Every prediction records its room, mode, model version and generation time.
+Input estimates updated after that time are rejected.
+
+## Calibration harness
+
+Calibration observations join a stored pre-game prediction to a later verified
+result. The evaluator rejects predictions generated after the game finished and
+prevents aggregation across model versions, modes, scoring rules or room sizes.
+It reports multiclass Brier score, mean log loss and binned expected calibration
+error for the full placement distribution.
+
 ## Current limits
 
 - The approximation treats pairwise placement comparisons as independent.
 - Default parameters are conservative starting values, not calibrated production
   constants.
-- Predictive probabilities and calibration evaluation are delivered separately
-  before the model is considered complete.
 - Predictive-accuracy claims require time-ordered real verified outcomes; unit
   tests only establish invariants and deterministic behavior.

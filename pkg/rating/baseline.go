@@ -114,14 +114,8 @@ func (b *Baseline) Update(result MatchResult, estimates map[string]Estimate, pro
 		if !exists {
 			return nil, fmt.Errorf("pre-game rating for player %q is required", participant.PlayerID)
 		}
-		if err := estimate.Validate(); err != nil {
-			return nil, fmt.Errorf("pre-game rating for player %q: %w", participant.PlayerID, err)
-		}
-		if estimate.ModelVersion != b.config.Version {
-			return nil, fmt.Errorf("pre-game rating for player %q uses model %q, want %q", participant.PlayerID, estimate.ModelVersion, b.config.Version)
-		}
-		if estimate.Uncertainty < b.config.MinimumUncertainty || estimate.Uncertainty > b.config.MaximumUncertainty {
-			return nil, fmt.Errorf("pre-game uncertainty for player %q is outside model bounds", participant.PlayerID)
+		if err := b.validateEstimate(participant.PlayerID, estimate); err != nil {
+			return nil, err
 		}
 		if estimate.Games == math.MaxUint64 {
 			return nil, fmt.Errorf("pre-game count for player %q cannot be incremented", participant.PlayerID)
@@ -168,6 +162,19 @@ func (b *Baseline) Update(result MatchResult, estimates map[string]Estimate, pro
 		})
 	}
 	return updates, nil
+}
+
+func (b *Baseline) validateEstimate(playerID string, estimate Estimate) error {
+	if err := estimate.Validate(); err != nil {
+		return fmt.Errorf("pre-game rating for player %q: %w", playerID, err)
+	}
+	if estimate.ModelVersion != b.config.Version {
+		return fmt.Errorf("pre-game rating for player %q uses model %q, want %q", playerID, estimate.ModelVersion, b.config.Version)
+	}
+	if estimate.Uncertainty < b.config.MinimumUncertainty || estimate.Uncertainty > b.config.MaximumUncertainty {
+		return fmt.Errorf("pre-game uncertainty for player %q is outside model bounds", playerID)
+	}
+	return nil
 }
 
 func comparisonScale(left, right Estimate, fallbackDeviation float64) float64 {
