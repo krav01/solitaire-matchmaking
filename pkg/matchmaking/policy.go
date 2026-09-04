@@ -1,5 +1,5 @@
-// Package matchmaking defines portable candidate and policy contracts.
-// Selection and probability calculations are implemented in the matching stage.
+// Package matchmaking defines portable candidate, policy and room-evaluation
+// contracts. Candidate ordering and queue orchestration are implemented later.
 package matchmaking
 
 import (
@@ -60,6 +60,7 @@ type Candidate struct {
 // application checks mode, fee, size, eligibility and policy versions first.
 type RoomView struct {
 	RoomID    string
+	ModeID    string
 	Capacity  int
 	CreatedAt time.Time
 	Deadline  time.Time
