@@ -60,7 +60,8 @@ using information available at the cutoff time and evaluates later outcomes.
 PostgreSQL will store tickets, room membership, sessions, verified outcomes,
 rating history and outgoing events. Atomic state transitions will use explicit,
 parameterized SQL transactions. Application startup checks connectivity and
-never applies schema changes. A separate migration runner will own migrations.
+never applies schema changes. The separate migration runner embeds reviewed,
+checksummed SQL and serializes migration batches with a PostgreSQL advisory lock.
 
 ## ADR-006: Explicit trust boundaries
 

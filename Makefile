@@ -1,7 +1,7 @@
 GO ?= go
 GOLANGCI_LINT ?= golangci-lint
 
-.PHONY: build test race lint fmt tidy check security
+.PHONY: build test race lint fmt tidy check security integration migrate
 
 build:
 	$(GO) build ./...
@@ -26,3 +26,9 @@ check: tidy build race lint
 
 security:
 	$(GO) run golang.org/x/vuln/cmd/govulncheck@v1.7.0 ./...
+
+integration:
+	$(GO) test -count=1 -run '^TestMigrationsApplyToPostgreSQL$$' ./internal/postgres
+
+migrate:
+	$(GO) run ./cmd/migrate

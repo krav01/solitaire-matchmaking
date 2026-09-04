@@ -32,5 +32,18 @@ services:
     security_opt:
       - no-new-privileges:true
 
+  migrate:
+    build: .
+    entrypoint: ["/migrate"]
+    profiles: ["tools"]
+    environment:
+      DATABASE_URL: postgres://matchmaking:matchmaking@postgres:5432/matchmaking?sslmode=disable
+    depends_on:
+      postgres:
+        condition: service_healthy
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+
 volumes:
   postgres-data:
