@@ -31,7 +31,7 @@
 ## Stage 4 — Transactional tournament lifecycle
 
 - [x] reviewed SQL migrations and explicit migration runner
-- idempotent ticket acceptance, assignment and cancellation
+- [x] idempotent ticket acceptance, assignment and cancellation
 - room/session state transitions and bounded worker claims
 - verified-result ingestion, deadlines and finalized standings
 - transactional outbox and retryable delivery

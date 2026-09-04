@@ -10,8 +10,8 @@ or stage status change.
 | Application | `internal/application` | Compose resources and future use cases | Foundation implemented |
 | HTTP | `internal/httpapi` | Health, readiness, authenticated capability API | Implemented |
 | Configuration | `internal/config` | Validated environment configuration | Implemented |
-| PostgreSQL | `internal/postgres` | Bounded pool, readiness and atomic migration runner | Stage 4 in progress |
-| Tournament | `internal/tournament` | Versioned lifecycle contracts | Contracts implemented |
+| PostgreSQL | `internal/postgres` | Pool, migrations and transactional ticket lifecycle adapter | Stage 4 in progress |
+| Tournament | `internal/tournament` | Versioned lifecycle contracts and ticket use cases | Stage 4 in progress |
 | Workers | `internal/worker` | Queue wake-ups, expiry and outbox delivery | Reserved for stage 4 |
 | Observability | `internal/observability` | Structured process logging | Foundation implemented |
 | Rating | `pkg/rating` | Baseline updates, placement predictions and calibration contracts | Stage 2 complete |

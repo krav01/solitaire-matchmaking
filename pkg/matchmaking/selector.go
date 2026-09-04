@@ -10,6 +10,7 @@ import (
 // RoomSelection is the chosen eligible destination for one candidate.
 type RoomSelection struct {
 	RoomID        string
+	RoomVersion   int64
 	MembersBefore int
 	Capacity      int
 	AgePriority   bool
@@ -82,6 +83,7 @@ func (e *Evaluator) SelectRoom(rooms []RoomView, candidate Candidate, evaluatedA
 	selected := options[0]
 	return RoomSelection{
 		RoomID:        selected.room.RoomID,
+		RoomVersion:   selected.room.AggregateVersion,
 		MembersBefore: len(selected.room.Members),
 		Capacity:      selected.room.Capacity,
 		AgePriority:   roomAgePrioritized(selected.room, evaluatedAt),

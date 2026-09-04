@@ -37,9 +37,10 @@ young rooms, `PreferNearlyFull` selects the room with the most existing members,
 then the smaller whole-room skill gap. Stable input order is retained when the
 preference is disabled.
 
-The selector returns a decision only; persistence must still claim the ticket
-and room atomically. `RoomLimit` bounds evaluation work independently from the
-per-room `CandidateLimit`.
+The selector returns a decision plus the aggregate version of the room view it
+evaluated. Persistence must still claim the ticket and room atomically and reject
+the assignment if that room version changed. `RoomLimit` bounds evaluation work
+independently from the per-room `CandidateLimit`.
 
 ## Attempt orchestration
 
@@ -58,10 +59,10 @@ final selection attempt before timing out. New room or membership events can
 invoke the same boundary immediately, so the periodic schedule is a recovery
 path rather than the only source of progress.
 
-The result is still advisory. The application must atomically confirm that the
-ticket is waiting and the room has capacity before assignment, then persist any
-next wake-up with the state transition. Those transactional concerns remain in
-stage 4.
+The result is still advisory. The application atomically confirms that the ticket
+is waiting, the room has capacity and the scored room version is unchanged. A
+stale selection returns to matching instead of weakening fairness. Persisting
+future retry wake-ups remains part of the worker stage.
 
 ## Integration boundary
 

@@ -11,8 +11,9 @@ The current stage implements a versioned baseline rating model, bounded fair
 room selection, deterministic retry decisions and reproducible simulation
 workloads with joint speed, timeout and fairness reports. The service process
 foundation provides configuration, PostgreSQL connectivity, liveness, readiness
-and an authenticated capability endpoint. Transactional tournament persistence
-remains a later stage.
+and an authenticated capability endpoint. Transactional persistence now covers
+versioned migrations plus idempotent ticket acceptance, cancellation and atomic
+room assignment; worker and result lifecycles remain in progress.
 
 ## Architecture
 
@@ -43,6 +44,7 @@ Requirements: Go 1.26 or later and PostgreSQL 18.
 ```bash
 cp .env.example .env
 docker compose up -d postgres
+docker compose run --rm migrate
 set -a
 . ./.env
 set +a

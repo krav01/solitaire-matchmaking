@@ -31,6 +31,9 @@ func (r RoomView) Validate() error {
 	if r.RoomID == "" || r.ModeID == "" {
 		return errors.New("room and mode ids are required")
 	}
+	if r.AggregateVersion < 0 {
+		return errors.New("room aggregate version cannot be negative")
+	}
 	if r.Capacity < rating.MinRoomSize || r.Capacity > rating.MaxRoomSize {
 		return fmt.Errorf("room capacity must be between %d and %d", rating.MinRoomSize, rating.MaxRoomSize)
 	}

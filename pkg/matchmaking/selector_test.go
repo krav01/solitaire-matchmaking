@@ -15,6 +15,7 @@ func TestSelectRoomPrefersNearlyFullEligibleRoom(t *testing.T) {
 	lessFull.RoomID = "less-full"
 	nearlyFull := testRoom(evaluatedAt.Add(-5*time.Second), 5, []float64{25, 25, 25, 25})
 	nearlyFull.RoomID = "nearly-full"
+	nearlyFull.AggregateVersion = 42
 	rooms := []matchmaking.RoomView{lessFull, nearlyFull}
 	original := cloneRooms(rooms)
 	candidate := testCandidate("candidate", "new-player", 25, evaluatedAt.Add(-time.Minute), evaluatedAt)
@@ -23,7 +24,7 @@ func TestSelectRoomPrefersNearlyFullEligibleRoom(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SelectRoom() error = %v", err)
 	}
-	if !found || selection.RoomID != nearlyFull.RoomID || selection.MembersBefore != 4 || selection.Capacity != 5 {
+	if !found || selection.RoomID != nearlyFull.RoomID || selection.RoomVersion != 42 || selection.MembersBefore != 4 || selection.Capacity != 5 {
 		t.Fatalf("SelectRoom() = %+v, found=%v, want nearly-full room", selection, found)
 	}
 	if !reflect.DeepEqual(rooms, original) {

@@ -61,13 +61,14 @@ type Candidate struct {
 // RoomView is the immutable input to candidate evaluation. The tournament
 // application checks mode, fee, size, eligibility and policy versions first.
 type RoomView struct {
-	RoomID    string
-	ModeID    string
-	Capacity  int
-	CreatedAt time.Time
-	Deadline  time.Time
-	Policy    Policy
-	Members   []Candidate
+	RoomID           string
+	ModeID           string
+	AggregateVersion int64
+	Capacity         int
+	CreatedAt        time.Time
+	Deadline         time.Time
+	Policy           Policy
+	Members          []Candidate
 }
 
 func finite(value float64) bool {
