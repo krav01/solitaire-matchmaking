@@ -21,12 +21,12 @@
 
 ## Stage 3 — Match formation and simulator
 
-- eligibility filtering and whole-room fairness validation
-- bounded skill-window expansion and waiting-age priority
-- preference for completing nearly full eligible rooms
-- event-driven selection plus periodic retry boundary
-- reproducible arrivals, skills, outcomes and tournament partition simulation
-- joint reports for fill latency, timeout rate and fairness
+- [x] eligibility filtering and whole-room fairness validation
+- [ ] bounded skill-window expansion and waiting-age priority
+- [ ] preference for completing nearly full eligible rooms
+- [ ] event-driven selection plus periodic retry boundary
+- [ ] reproducible arrivals, skills, outcomes and tournament partition simulation
+- [ ] joint reports for fill latency, timeout rate and fairness
 
 ## Stage 4 — Transactional tournament lifecycle
 
