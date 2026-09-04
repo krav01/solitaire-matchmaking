@@ -13,11 +13,11 @@
 
 ## Stage 2 — Baseline rating
 
-- rating update from complete placements and opponent estimates
-- uncertainty-aware updates for five-, six- and seven-player rooms
-- immutable model versions and replayable rating history contract
-- predicted placement probabilities and calibration test harness
-- deterministic unit, property and simulation tests
+- [x] rating update from complete placements and opponent estimates
+- [x] uncertainty-aware updates for five-, six- and seven-player rooms
+- [x] immutable model versions and replayable rating history contract
+- [ ] predicted placement probabilities and calibration test harness
+- [ ] deterministic unit, property and simulation tests
 
 ## Stage 3 — Match formation and simulator
 
