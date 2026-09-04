@@ -11,13 +11,22 @@ snapshots, then returns decisions in input order.
 3. Reject duplicate tickets and players.
 4. Require the policy's rating-model version.
 5. Enforce the maximum skill gap over every proposed room member.
-6. When a candidate completes the room, predict every member's first-place
+6. Enforce the room's active skill window. It expands in bounded, deterministic
+   steps from the initial gap to the hard maximum as the room waits.
+7. When a candidate completes the room, predict every member's first-place
    chance and enforce the maximum probability spread over the entire room.
 
 Snapshot and evaluation timestamps prevent current-game outcomes from entering
 opponent selection. Filtering does not mutate the room or rank accepted
-candidates. Window expansion, waiting age and fill-speed priority are later
-selection steps and cannot relax either hard fairness maximum.
+candidates. Expansion can admit a wider skill range over time but cannot relax
+the maximum skill gap or probability-spread limit.
+
+## Waiting-age priority
+
+Active rooms reaching `AgePriorityAfter` move ahead of younger rooms. Prioritized
+rooms are ordered oldest first, while the relative order of young rooms is kept
+for the later fill-speed ranking. This prevents starvation without allowing an
+old room to bypass candidate eligibility or hard fairness limits.
 
 ## Integration boundary
 
