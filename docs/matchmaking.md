@@ -41,6 +41,28 @@ The selector returns a decision only; persistence must still claim the ticket
 and room atomically. `RoomLimit` bounds evaluation work independently from the
 per-room `CandidateLimit`.
 
+## Attempt orchestration
+
+`AttemptMatch` is the side-effect-free boundary shared by ticket-accepted and
+room-changed events plus periodic retries. It validates one bounded room
+partition, tries the same fair selector for every trigger and returns exactly
+one application action:
+
+- `matched` with the selected room;
+- `retry_scheduled` with an absolute, drift-free retry time; or
+- `timed_out` at the ticket's fill deadline.
+
+Retries align to the ticket join time and may run earlier at a room's next skill
+window expansion or deadline. A retry at the exact ticket deadline makes one
+final selection attempt before timing out. New room or membership events can
+invoke the same boundary immediately, so the periodic schedule is a recovery
+path rather than the only source of progress.
+
+The result is still advisory. The application must atomically confirm that the
+ticket is waiting and the room has capacity before assignment, then persist any
+next wake-up with the state transition. Those transactional concerns remain in
+stage 4.
+
 ## Integration boundary
 
 `Evaluator` depends on the small `PlacementPredictor` interface. The baseline

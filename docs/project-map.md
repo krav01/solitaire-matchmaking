@@ -15,7 +15,7 @@ or stage status change.
 | Workers | `internal/worker` | Queue wake-ups, expiry and outbox delivery | Reserved for stage 4 |
 | Observability | `internal/observability` | Structured process logging | Foundation implemented |
 | Rating | `pkg/rating` | Baseline updates, placement predictions and calibration contracts | Stage 2 complete |
-| Matching | `pkg/matchmaking` | Bounded fair room selection with age and fill priority | Stage 3 in progress |
+| Matching | `pkg/matchmaking` | Bounded fair selection and deterministic retry scheduling | Stage 3 in progress |
 | Current API | `api/openapi.yaml` | Machine-readable implemented endpoints | Implemented |
 | Planned API | `docs/api-contract.md` | Integration boundary awaiting use cases | Draft |
 | Persistence | `migrations` | Versioned schema migrations | Stage 4 |

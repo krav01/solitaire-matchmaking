@@ -1,5 +1,6 @@
-// Package matchmaking defines portable candidate, policy and room-evaluation
-// contracts. Candidate ordering and queue orchestration are implemented later.
+// Package matchmaking defines portable candidate, policy, room-evaluation and
+// retry-scheduling contracts. Durable queue orchestration is implemented by the
+// consuming application.
 package matchmaking
 
 import (
