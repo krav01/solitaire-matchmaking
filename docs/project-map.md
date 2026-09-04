@@ -6,7 +6,7 @@ or stage status change.
 | Area | Location | Current responsibility | Status |
 | --- | --- | --- | --- |
 | Process entry | `cmd/server` | Load config, signals, logging, call application | Implemented |
-| Simulator | `cmd/simulator` | Reproducible traffic, skill and outcome simulation | Stage 3 |
+| Simulator | `internal/simulator`, `cmd/simulator` | Reproducible partitioned workloads and outcomes | Stage 3 |
 | Application | `internal/application` | Compose resources and future use cases | Foundation implemented |
 | HTTP | `internal/httpapi` | Health, readiness, authenticated capability API | Implemented |
 | Configuration | `internal/config` | Validated environment configuration | Implemented |
