@@ -6,7 +6,7 @@ or stage status change.
 | Area | Location | Current responsibility | Status |
 | --- | --- | --- | --- |
 | Process entry | `cmd/server` | Load config, signals, logging, call application | Implemented |
-| Simulator | `internal/simulator`, `cmd/simulator` | Reproducible partitioned workloads and outcomes | Stage 3 |
+| Simulator | `internal/simulator`, `cmd/simulator` | Joint speed, timeout, fairness and calibration experiments | Stage 3 complete |
 | Application | `internal/application` | Compose resources and future use cases | Foundation implemented |
 | HTTP | `internal/httpapi` | Health, readiness, authenticated capability API | Implemented |
 | Configuration | `internal/config` | Validated environment configuration | Implemented |
@@ -15,7 +15,7 @@ or stage status change.
 | Workers | `internal/worker` | Queue wake-ups, expiry and outbox delivery | Reserved for stage 4 |
 | Observability | `internal/observability` | Structured process logging | Foundation implemented |
 | Rating | `pkg/rating` | Baseline updates, placement predictions and calibration contracts | Stage 2 complete |
-| Matching | `pkg/matchmaking` | Bounded fair selection and deterministic retry scheduling | Stage 3 in progress |
+| Matching | `pkg/matchmaking` | Bounded fair selection and deterministic retry scheduling | Stage 3 complete |
 | Current API | `api/openapi.yaml` | Machine-readable implemented endpoints | Implemented |
 | Planned API | `docs/api-contract.md` | Integration boundary awaiting use cases | Draft |
 | Persistence | `migrations` | Versioned schema migrations | Stage 4 |

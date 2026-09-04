@@ -7,7 +7,7 @@ import (
 )
 
 // AttemptTrigger identifies why the application evaluated a waiting ticket.
-// Both triggers use the same deterministic matching rules.
+// All triggers use the same deterministic matching rules.
 type AttemptTrigger string
 
 const (
