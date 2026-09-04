@@ -9,7 +9,7 @@
 - [x] domain contracts for tournaments, rating and matching policy
 - [x] documented trust boundary, data model and quality measures
 - [x] unit tests, race/lint/security CI and container setup
-- [ ] publish the foundation branch and run hosted CI
+- [x] publish the foundation branch and run hosted CI
 
 ## Stage 2 — Baseline rating
 
