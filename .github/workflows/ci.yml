@@ -32,6 +32,37 @@ jobs:
       - name: Test with race detector
         run: go test -race -shuffle=on -coverprofile=coverage.out ./...
 
+  postgres:
+    name: PostgreSQL integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_DB: matchmaking_test
+          POSTGRES_USER: matchmaking
+          POSTGRES_PASSWORD: matchmaking
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U matchmaking -d matchmaking_test"
+          --health-interval 2s
+          --health-timeout 2s
+          --health-retries 15
+    env:
+      TEST_DATABASE_URL: postgres://matchmaking:matchmaking@127.0.0.1:5432/matchmaking_test?sslmode=disable
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Apply embedded migrations twice
+        run: go test -count=1 -run '^TestMigrationsApplyToPostgreSQL$' ./internal/postgres
+
   lint:
     name: Lint
     runs-on: ubuntu-latest

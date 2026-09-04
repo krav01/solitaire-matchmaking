@@ -10,7 +10,7 @@ or stage status change.
 | Application | `internal/application` | Compose resources and future use cases | Foundation implemented |
 | HTTP | `internal/httpapi` | Health, readiness, authenticated capability API | Implemented |
 | Configuration | `internal/config` | Validated environment configuration | Implemented |
-| PostgreSQL | `internal/postgres` | Bounded connection pool and readiness | Foundation implemented |
+| PostgreSQL | `internal/postgres` | Bounded pool, readiness and atomic migration runner | Stage 4 in progress |
 | Tournament | `internal/tournament` | Versioned lifecycle contracts | Contracts implemented |
 | Workers | `internal/worker` | Queue wake-ups, expiry and outbox delivery | Reserved for stage 4 |
 | Observability | `internal/observability` | Structured process logging | Foundation implemented |
@@ -18,7 +18,7 @@ or stage status change.
 | Matching | `pkg/matchmaking` | Bounded fair selection and deterministic retry scheduling | Stage 3 complete |
 | Current API | `api/openapi.yaml` | Machine-readable implemented endpoints | Implemented |
 | Planned API | `docs/api-contract.md` | Integration boundary awaiting use cases | Draft |
-| Persistence | `migrations` | Versioned schema migrations | Stage 4 |
+| Persistence | `migrations` | Embedded, checksummed, forward-only PostgreSQL schema | Stage 4 in progress |
 
 ## Dependency direction
 
