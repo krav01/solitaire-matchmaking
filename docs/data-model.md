@@ -19,6 +19,7 @@ require validation against production traffic before release.
 Required integrity rules for stage 4:
 
 - an `entry_id` creates at most one effective ticket;
+- cancellation commands and room assignments have stable retry identities;
 - a ticket has at most one active room assignment;
 - seats are unique and bounded by the room capacity;
 - a verified result is applied once by its event id;
@@ -34,6 +35,13 @@ player rating by mode/model, and pending outbox events. Index design follows tho
 queries. Partial indexes keep worker scans restricted to queued, forming,
 unprocessed or undelivered rows. Worker transactions will claim bounded batches
 with `FOR UPDATE SKIP LOCKED`; scoring remains outside row-locking transactions.
+
+Ticket acceptance is idempotent by `entry_id`; cancellation is idempotent by
+ticket plus command id; assignment is idempotent by assignment id. Assignment
+locks only the selected ticket and room, rechecks the immutable tournament and
+rating-model partition plus the room version scored by the matcher, chooses a bounded seat, and commits membership, session,
+state versions and outbox records together. A concurrent attempt for the final
+seat observes the filled room and can return to matching.
 
 The physical result record represents one complete, game-backend-verified room
 outcome with participant rows. Optional feature columns remain nullable so absent

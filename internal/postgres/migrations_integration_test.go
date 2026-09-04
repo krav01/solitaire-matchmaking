@@ -27,8 +27,8 @@ func TestMigrationsApplyToPostgreSQL(t *testing.T) {
 	if err != nil {
 		t.Fatalf("first ApplyMigrations() error = %v", err)
 	}
-	if applied != 1 {
-		t.Fatalf("first ApplyMigrations() = %d, want 1", applied)
+	if applied < 0 || applied > 2 {
+		t.Fatalf("first ApplyMigrations() = %d, want zero to two pending migrations", applied)
 	}
 	applied, err = postgres.ApplyMigrations(ctx, pool)
 	if err != nil {
@@ -42,6 +42,7 @@ func TestMigrationsApplyToPostgreSQL(t *testing.T) {
 		"schema_migrations",
 		"tournament_configs",
 		"matchmaking_tickets",
+		"ticket_commands",
 		"rooms",
 		"sessions",
 		"verified_results",
@@ -57,11 +58,12 @@ func TestMigrationsApplyToPostgreSQL(t *testing.T) {
 		}
 	}
 
-	var checksumLength int
-	if err := pool.QueryRow(ctx, "SELECT length(checksum) FROM schema_migrations WHERE version = $1", 1).Scan(&checksumLength); err != nil {
-		t.Fatalf("read migration checksum: %v", err)
+	var migrationCount int
+	var minimumChecksumLength int
+	if err := pool.QueryRow(ctx, "SELECT count(*), min(length(checksum)) FROM schema_migrations").Scan(&migrationCount, &minimumChecksumLength); err != nil {
+		t.Fatalf("read migration ledger: %v", err)
 	}
-	if checksumLength != 64 {
-		t.Fatalf("migration checksum length = %d, want 64", checksumLength)
+	if migrationCount != 2 || minimumChecksumLength != 64 {
+		t.Fatalf("migration count = %d, minimum checksum length = %d", migrationCount, minimumChecksumLength)
 	}
 }

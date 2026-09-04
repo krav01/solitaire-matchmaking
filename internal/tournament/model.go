@@ -77,8 +77,11 @@ type Ticket struct {
 	Status            TicketStatus
 	RequestedAt       time.Time
 	AssignedAt        *time.Time
+	CancelledAt       *time.Time
+	ExpiredAt         *time.Time
 	SnapshotAt        time.Time
 	RatingSnapshot    rating.Estimate
+	AggregateVersion  int64
 }
 
 type Room struct {

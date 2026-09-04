@@ -11,22 +11,24 @@ func TestLoadReturnsOrderedImmutableCatalog(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
 	}
-	if len(catalog) != 1 {
-		t.Fatalf("Load() count = %d, want 1", len(catalog))
+	if len(catalog) != 2 {
+		t.Fatalf("Load() count = %d, want 2", len(catalog))
 	}
-	migration := catalog[0]
-	if migration.Version != 1 || migration.Name != "initial_schema" {
-		t.Fatalf("Load()[0] = %+v", migration)
-	}
-	if len(migration.Checksum) != 64 || strings.TrimSpace(migration.SQL) == "" {
-		t.Fatalf("Load()[0] has invalid contents or checksum")
+	wantNames := []string{"initial_schema", "ticket_lifecycle"}
+	for index, migration := range catalog {
+		if migration.Version != int64(index+1) || migration.Name != wantNames[index] {
+			t.Fatalf("Load()[%d] = %+v", index, migration)
+		}
+		if len(migration.Checksum) != 64 || strings.TrimSpace(migration.SQL) == "" {
+			t.Fatalf("Load()[%d] has invalid contents or checksum", index)
+		}
 	}
 
 	second, err := Load()
 	if err != nil {
 		t.Fatalf("second Load() error = %v", err)
 	}
-	if second[0] != migration {
+	if second[0] != catalog[0] || second[1] != catalog[1] {
 		t.Fatal("embedded migration catalog changed between reads")
 	}
 }
