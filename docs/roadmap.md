@@ -22,7 +22,7 @@
 ## Stage 3 — Match formation and simulator
 
 - [x] eligibility filtering and whole-room fairness validation
-- [ ] bounded skill-window expansion and waiting-age priority
+- [x] bounded skill-window expansion and waiting-age priority
 - [ ] preference for completing nearly full eligible rooms
 - [ ] event-driven selection plus periodic retry boundary
 - [ ] reproducible arrivals, skills, outcomes and tournament partition simulation

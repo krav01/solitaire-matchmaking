@@ -26,6 +26,7 @@ const (
 	RejectionDuplicatePlayer        RejectionCode = "duplicate_player"
 	RejectionRatingModelMismatch    RejectionCode = "rating_model_mismatch"
 	RejectionSkillGapExceeded       RejectionCode = "skill_gap_exceeded"
+	RejectionSkillWindowExceeded    RejectionCode = "skill_window_exceeded"
 	RejectionProbabilityGapExceeded RejectionCode = "win_probability_spread_exceeded"
 )
 
@@ -36,6 +37,7 @@ type CandidateDecision struct {
 	Eligible             bool
 	Rejection            RejectionCode
 	SkillGap             float64
+	AllowedSkillGap      float64
 	WinProbabilitySpread *float64
 }
 
@@ -119,8 +121,17 @@ func (e *Evaluator) evaluateCandidate(room RoomView, candidate Candidate, evalua
 	proposedMembers = append(proposedMembers, room.Members...)
 	proposedMembers = append(proposedMembers, candidate)
 	decision.SkillGap = skillGap(proposedMembers)
+	allowedSkillGap, err := room.Policy.AllowedSkillGap(evaluatedAt.Sub(room.CreatedAt))
+	if err != nil {
+		return CandidateDecision{}, err
+	}
+	decision.AllowedSkillGap = allowedSkillGap
 	if decision.SkillGap > room.Policy.MaxSkillGap {
 		decision.Rejection = RejectionSkillGapExceeded
+		return decision, nil
+	}
+	if decision.SkillGap > allowedSkillGap {
+		decision.Rejection = RejectionSkillWindowExceeded
 		return decision, nil
 	}
 	if len(proposedMembers) < room.Capacity {
