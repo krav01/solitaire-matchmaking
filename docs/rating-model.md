@@ -55,5 +55,6 @@ error for the full placement distribution.
 - The approximation treats pairwise placement comparisons as independent.
 - Default parameters are conservative starting values, not calibrated production
   constants.
-- Predictive-accuracy claims require time-ordered real verified outcomes; unit
-  tests only establish invariants and deterministic behavior.
+- Predictive-accuracy claims require time-ordered real verified outcomes;
+  fixed-seed property and simulation tests only establish invariants,
+  reproducibility and expected learning behavior on synthetic data.
