@@ -14,7 +14,7 @@ or stage status change.
 | Tournament | `internal/tournament` | Versioned lifecycle contracts | Contracts implemented |
 | Workers | `internal/worker` | Queue wake-ups, expiry and outbox delivery | Reserved for stage 4 |
 | Observability | `internal/observability` | Structured process logging | Foundation implemented |
-| Rating | `pkg/rating` | Baseline updates, placement predictions and calibration contracts | Stage 2 in progress |
+| Rating | `pkg/rating` | Baseline updates, placement predictions and calibration contracts | Stage 2 complete |
 | Matching | `pkg/matchmaking` | Portable candidates, rooms and policy | Contracts implemented |
 | Current API | `api/openapi.yaml` | Machine-readable implemented endpoints | Implemented |
 | Planned API | `docs/api-contract.md` | Integration boundary awaiting use cases | Draft |
