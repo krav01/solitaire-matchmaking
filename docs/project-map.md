@@ -7,11 +7,11 @@ or stage status change.
 | --- | --- | --- | --- |
 | Process entry | `cmd/server` | Load config, signals, logging, call application | Implemented |
 | Simulator | `internal/simulator`, `cmd/simulator` | Joint speed, timeout, fairness and calibration experiments | Stage 3 complete |
-| Application | `internal/application` | Compose ticket, matching, result, rating and event-delivery use cases | Stage 4 in progress |
+| Application | `internal/application` | Compose ticket, matching, result, rating and event-delivery use cases | Stage 4 complete |
 | HTTP | `internal/httpapi` | Health, readiness, capabilities and authenticated result ingestion | Result endpoint implemented |
 | Configuration | `internal/config` | Validated environment configuration | Implemented |
-| PostgreSQL | `internal/postgres` | Pool, migrations, ticket/match/rating/outbox queues and atomic state transitions | Stage 4 in progress |
-| Tournament | `internal/tournament` | Versioned ticket, result and deadline lifecycle contracts | Stage 4 in progress |
+| PostgreSQL | `internal/postgres` | Pool, migrations, ticket/match/rating/outbox queues and atomic state transitions | Stage 4 complete |
+| Tournament | `internal/tournament` | Versioned ticket, result and deadline lifecycle contracts | Stage 4 complete |
 | Workers | `internal/worker` | Bounded matchmaking, deadline expiry, ordered rating and outbox delivery | Stage 4 workers implemented |
 | Event delivery | `internal/eventdelivery` | Authenticated, idempotent HTTPS publication to the game backend | Implemented |
 | Observability | `internal/observability` | Structured process logging | Foundation implemented |
@@ -19,7 +19,7 @@ or stage status change.
 | Matching | `pkg/matchmaking` | Bounded fair selection and deterministic retry scheduling | Stage 3 complete |
 | Current API | `api/openapi.yaml` | Machine-readable health, capability and result endpoints | Implemented |
 | Planned API | `docs/api-contract.md` | Remaining ticket, room and rating integration boundary | Draft |
-| Persistence | `migrations` | Embedded schema including ticket, worker, result and outbox invariants | Stage 4 in progress |
+| Persistence | `migrations` | Embedded schema including ticket, worker, result and outbox invariants | Stage 4 complete |
 
 ## Dependency direction
 

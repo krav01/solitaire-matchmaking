@@ -36,7 +36,7 @@
 - [x] verified-result ingestion, deadlines and finalized standings
 - [x] strictly time-ordered baseline rating persistence
 - [x] transactional outbox and retryable delivery
-- PostgreSQL integration and end-to-end tests
+- [x] PostgreSQL integration and end-to-end tests
 
 ## Stage 5 — Extended rating
 
