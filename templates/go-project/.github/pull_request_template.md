@@ -9,6 +9,14 @@
 - [ ] Medium
 - [ ] High
 
+## Reasoning (required for medium/high risk)
+
+- Chosen approach:
+- Alternatives considered:
+- Why rejected/deferred:
+- Risk accepted:
+- Revisit trigger:
+
 ## Review
 
 - [ ] Correctness / edge cases reviewed
@@ -32,3 +40,4 @@
 
 - Deferred debt:
 - ADR/doc updates:
+- Incident/regression guardrail, if applicable:
