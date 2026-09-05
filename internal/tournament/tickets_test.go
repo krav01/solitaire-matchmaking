@@ -139,6 +139,10 @@ func (repository *recordingTicketRepository) CancelTicket(context.Context, tourn
 	return tournament.TicketMutation{}, nil
 }
 
+func (repository *recordingTicketRepository) GetTicket(context.Context, string) (tournament.TicketState, error) {
+	return tournament.TicketState{}, nil
+}
+
 func (repository *recordingTicketRepository) AssignTicket(context.Context, tournament.AssignTicketCommand) (tournament.Assignment, error) {
 	repository.calls++
 	return tournament.Assignment{}, nil

@@ -36,13 +36,13 @@ func Run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	if err != nil {
 		return err
 	}
-	server, err := httpapi.New(pool, resultService, logger, httpapi.Options{
-		APIToken: cfg.APIToken, ReadinessTimeout: cfg.ReadinessTimeout, ShutdownTimeout: cfg.ShutdownTimeout,
-	})
+	ticketService, err := tournament.NewTicketService(ticketStore)
 	if err != nil {
 		return err
 	}
-	ticketService, err := tournament.NewTicketService(ticketStore)
+	server, err := httpapi.New(pool, ticketService, resultService, logger, httpapi.Options{
+		APIToken: cfg.APIToken, ReadinessTimeout: cfg.ReadinessTimeout, ShutdownTimeout: cfg.ShutdownTimeout,
+	})
 	if err != nil {
 		return err
 	}

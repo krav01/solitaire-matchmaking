@@ -68,6 +68,10 @@ ON CONFLICT DO NOTHING`,
 		ticket.RatingSnapshot.ModelVersion, ticket.RatingSnapshot.UpdatedAt, ticket.AggregateVersion,
 	)
 	if err != nil {
+		var postgresError *pgconn.PgError
+		if errors.As(err, &postgresError) && postgresError.Code == "23503" {
+			return tournament.TicketMutation{}, tournament.ErrTournamentNotFound
+		}
 		return tournament.TicketMutation{}, fmt.Errorf("insert ticket: %w", err)
 	}
 	if result.RowsAffected() == 0 {
@@ -204,6 +208,29 @@ INSERT INTO ticket_commands (
 		return tournament.TicketMutation{}, fmt.Errorf("commit ticket cancellation: %w", err)
 	}
 	return tournament.TicketMutation{Ticket: stored.ticket, Changed: changed}, nil
+}
+
+func (store *TicketStore) GetTicket(ctx context.Context, ticketID string) (tournament.TicketState, error) {
+	stored, err := loadTicketByID(ctx, store.pool, ticketID, false)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return tournament.TicketState{}, tournament.ErrTicketNotFound
+	}
+	if err != nil {
+		return tournament.TicketState{}, fmt.Errorf("read ticket: %w", err)
+	}
+
+	state := tournament.TicketState{Ticket: stored.ticket}
+	if stored.ticket.Status != tournament.TicketAssigned {
+		return state, nil
+	}
+
+	assignment, err := loadAssignmentByTicket(ctx, store.pool, ticketID)
+	if err != nil {
+		return tournament.TicketState{}, fmt.Errorf("read ticket assignment: %w", err)
+	}
+	state.Assignment = &assignment.assignment
+
+	return state, nil
 }
 
 func (store *TicketStore) ExpireTicket(ctx context.Context, command tournament.ExpireTicketCommand) (tournament.TicketMutation, error) {
@@ -467,20 +494,20 @@ type storedTicket struct {
 	attemptCount  int64
 }
 
-func loadTicketByEntry(ctx context.Context, tx pgx.Tx, entryID string, forUpdate bool) (storedTicket, error) {
+func loadTicketByEntry(ctx context.Context, querier queryRower, entryID string, forUpdate bool) (storedTicket, error) {
 	query := ticketSelectSQL + " WHERE entry_id = $1"
 	if forUpdate {
 		query += " FOR UPDATE"
 	}
-	return scanStoredTicket(tx.QueryRow(ctx, query, entryID))
+	return scanStoredTicket(querier.QueryRow(ctx, query, entryID))
 }
 
-func loadTicketByID(ctx context.Context, tx pgx.Tx, ticketID string, forUpdate bool) (storedTicket, error) {
+func loadTicketByID(ctx context.Context, querier queryRower, ticketID string, forUpdate bool) (storedTicket, error) {
 	query := ticketSelectSQL + " WHERE ticket_id = $1"
 	if forUpdate {
 		query += " FOR UPDATE"
 	}
-	return scanStoredTicket(tx.QueryRow(ctx, query, ticketID))
+	return scanStoredTicket(querier.QueryRow(ctx, query, ticketID))
 }
 
 const ticketSelectSQL = `
@@ -494,6 +521,10 @@ FROM matchmaking_tickets`
 
 type rowScanner interface {
 	Scan(dest ...any) error
+}
+
+type queryRower interface {
+	QueryRow(context.Context, string, ...any) pgx.Row
 }
 
 func scanStoredTicket(row rowScanner) (storedTicket, error) {
@@ -549,9 +580,9 @@ type storedAssignment struct {
 	requestDigest string
 }
 
-func loadAssignmentByIdentity(ctx context.Context, tx pgx.Tx, assignmentID string) (storedAssignment, error) {
+func loadAssignmentByIdentity(ctx context.Context, querier queryRower, assignmentID string) (storedAssignment, error) {
 	var result storedAssignment
-	err := tx.QueryRow(ctx, `
+	err := querier.QueryRow(ctx, `
 SELECT rm.assignment_id, rm.ticket_id, rm.room_id, s.session_id, rm.player_id,
        rm.seat, rm.assigned_at, rm.ticket_version, rm.room_version,
        rm.room_filled, rm.result_deadline, rm.request_digest
@@ -565,6 +596,26 @@ WHERE rm.assignment_id = $1`, assignmentID).Scan(
 		&result.assignment.RoomVersion, &result.assignment.RoomFilled,
 		&result.assignment.ResultDeadline, &result.requestDigest,
 	)
+	return result, err
+}
+
+func loadAssignmentByTicket(ctx context.Context, querier queryRower, ticketID string) (storedAssignment, error) {
+	var result storedAssignment
+	err := querier.QueryRow(ctx, `
+SELECT rm.assignment_id, rm.ticket_id, rm.room_id, s.session_id, rm.player_id,
+       rm.seat, rm.assigned_at, rm.ticket_version, rm.room_version,
+       rm.room_filled, rm.result_deadline, rm.request_digest
+FROM room_memberships AS rm
+JOIN sessions AS s ON s.ticket_id = rm.ticket_id
+WHERE rm.ticket_id = $1`, ticketID).Scan(
+		&result.assignment.AssignmentID, &result.assignment.TicketID,
+		&result.assignment.RoomID, &result.assignment.SessionID,
+		&result.assignment.PlayerID, &result.assignment.Seat,
+		&result.assignment.AssignedAt, &result.assignment.TicketVersion,
+		&result.assignment.RoomVersion, &result.assignment.RoomFilled,
+		&result.assignment.ResultDeadline, &result.requestDigest,
+	)
+
 	return result, err
 }
 
