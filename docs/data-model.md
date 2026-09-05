@@ -45,6 +45,14 @@ rating-model partition plus the room version scored by the matcher, chooses a bo
 state versions and outbox records together. A concurrent attempt for the final
 seat observes the filled room and can return to matching.
 
+Verified-result ingestion is idempotent by result event id and canonical request
+digest. It locks the room, verifies the complete session/player set plus immutable
+mode, deck and scoring version, rejects arrivals after the result deadline, and
+commits standings, session terminal states, `completed` room state and the
+`room.completed` outbox event together. A bounded deadline worker changes overdue
+collecting rooms to `expired`, forfeits unfinished sessions and emits
+`room.expired` in the same transaction.
+
 Retry scheduling is absolute and derived from the immutable policy. A stale room
 version receives a short retry without relaxing fairness. At the ticket deadline,
 the worker performs one final match attempt and otherwise commits `expired` plus
@@ -53,4 +61,5 @@ its outbox event atomically.
 The physical result record represents one complete, game-backend-verified room
 outcome with participant rows. Optional feature columns remain nullable so absent
 telemetry cannot become a zero observation. Rating snapshots are copied onto
-tickets and never replaced by results from the room being matched.
+tickets and never replaced by results from the room being matched. Finalized
+results remain unprocessed until the time-ordered rating worker is implemented.

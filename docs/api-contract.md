@@ -1,8 +1,7 @@
 # Planned game-backend contract
 
-This document defines integration direction. Only endpoints in `api/openapi.yaml`
-exist in the foundation. Business endpoints become part of the OpenAPI document
-when their use cases are implemented and tested.
+This document defines the remaining integration direction. Implemented endpoints,
+including verified-result ingestion, are defined in `api/openapi.yaml`.
 
 ## Commands
 
@@ -10,7 +9,7 @@ when their use cases are implemented and tested.
 | --- | --- | --- |
 | `POST /v1/tickets` | Accept an eligible, reserved tournament entry and rating snapshot | entry id |
 | `DELETE /v1/tickets/{ticket_id}` | Cancel a queued entry subject to tournament rules | ticket id + command id |
-| `POST /v1/results` | Accept a server-verified session result | result event id |
+| `POST /v1/results` | Accept a server-verified complete room result (implemented) | result event id |
 
 ## Queries
 
@@ -30,5 +29,6 @@ input merely because the client submitted it.
 
 Outgoing assignment, room completion and settlement-request events use a
 transactional outbox. Delivery is at least once, so consumers must deduplicate by
-event id. The settlement response contract and rules for ties, forfeits, incomplete
-rooms and late results must be approved before the result workflow is implemented.
+event id. The implemented baseline permits tied places, maps `completed: false`
+to a forfeited session, rejects incomplete rooms, and rejects results accepted
+after the room deadline. Settlement responses remain outside this service.

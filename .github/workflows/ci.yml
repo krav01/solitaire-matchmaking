@@ -66,6 +66,8 @@ jobs:
         run: go test -count=1 -run '^TestTicketLifecyclePostgreSQL$' ./internal/postgres
       - name: Test concurrent matchmaking worker
         run: go test -count=1 -run '^TestMatchmakingWorkerPostgreSQL$' ./internal/postgres
+      - name: Test verified result finalization
+        run: go test -count=1 -run '^TestResultFinalizationPostgreSQL$' ./internal/postgres
 
   lint:
     name: Lint

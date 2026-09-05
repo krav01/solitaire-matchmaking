@@ -23,17 +23,31 @@ func Run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 		return err
 	}
 	defer pool.Close()
-	server, err := httpapi.New(pool, logger, httpapi.Options{
+	ticketStore, err := postgres.NewTicketStore(pool)
+	if err != nil {
+		return err
+	}
+	resultStore, err := postgres.NewResultStore(pool)
+	if err != nil {
+		return err
+	}
+	resultService, err := tournament.NewResultService(resultStore)
+	if err != nil {
+		return err
+	}
+	server, err := httpapi.New(pool, resultService, logger, httpapi.Options{
 		APIToken: cfg.APIToken, ReadinessTimeout: cfg.ReadinessTimeout, ShutdownTimeout: cfg.ShutdownTimeout,
 	})
 	if err != nil {
 		return err
 	}
-	ticketStore, err := postgres.NewTicketStore(pool)
+	ticketService, err := tournament.NewTicketService(ticketStore)
 	if err != nil {
 		return err
 	}
-	ticketService, err := tournament.NewTicketService(ticketStore)
+	deadlineRunner, err := worker.NewResultDeadlineRunner(resultService, logger, worker.ResultDeadlineOptions{
+		BatchSize: cfg.ResultDeadlineBatch, PollInterval: cfg.ResultDeadlinePoll,
+	})
 	if err != nil {
 		return err
 	}
@@ -59,15 +73,19 @@ func Run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	}
 	workerCtx, stopWorker := context.WithCancel(ctx)
 	var workers sync.WaitGroup
-	workers.Add(1)
+	workers.Add(2)
 	go func() {
 		defer workers.Done()
 		runner.Run(workerCtx)
+	}()
+	go func() {
+		defer workers.Done()
+		deadlineRunner.Run(workerCtx)
 	}()
 	defer func() {
 		stopWorker()
 		workers.Wait()
 	}()
-	logger.Info("server started", "address", listener.Addr().String(), "stage", "transactional_lifecycle")
+	logger.Info("server started", "address", listener.Addr().String(), "stage", "result_finalization")
 	return server.Serve(ctx, listener)
 }

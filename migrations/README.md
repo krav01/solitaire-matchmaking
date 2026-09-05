@@ -19,5 +19,8 @@ Application startup never modifies the schema.
 Workers use the partial due-ticket index and `FOR UPDATE SKIP LOCKED`; scoring
 runs after the claim transaction releases its row locks.
 
+`000004_result_finalization` enforces canonical SHA-256 request digests for
+idempotent verified-result ingestion.
+
 Rollback uses a reviewed compensating forward migration. Destructive automatic
 down migrations are intentionally unsupported.

@@ -26,6 +26,8 @@ type Config struct {
 	MatchPollInterval    time.Duration
 	MatchFailureBackoff  time.Duration
 	MatchStaleRetryDelay time.Duration
+	ResultDeadlineBatch  int
+	ResultDeadlinePoll   time.Duration
 }
 
 // Load accepts an environment accessor to keep tests isolated from os.Environ.
@@ -38,6 +40,7 @@ func Load(getenv func(string) string) (Config, error) {
 		MatchBatchSize: 32, MatchConcurrency: 8, MatchLease: 10 * time.Second,
 		MatchPollInterval: 100 * time.Millisecond, MatchFailureBackoff: time.Second,
 		MatchStaleRetryDelay: 50 * time.Millisecond,
+		ResultDeadlineBatch:  32, ResultDeadlinePoll: time.Second,
 	}
 	if value := getenv("HTTP_ADDR"); value != "" {
 		c.HTTPAddr = value
@@ -56,6 +59,7 @@ func Load(getenv func(string) string) (Config, error) {
 	}{
 		{"MATCH_WORKER_BATCH_SIZE", &c.MatchBatchSize, 256},
 		{"MATCH_WORKER_CONCURRENCY", &c.MatchConcurrency, 256},
+		{"RESULT_DEADLINE_BATCH_SIZE", &c.ResultDeadlineBatch, 256},
 	} {
 		if value := getenv(entry.key); value != "" {
 			n, err := strconv.Atoi(value)
@@ -76,6 +80,7 @@ func Load(getenv func(string) string) (Config, error) {
 		{"MATCH_WORKER_POLL_INTERVAL", &c.MatchPollInterval},
 		{"MATCH_WORKER_FAILURE_BACKOFF", &c.MatchFailureBackoff},
 		{"MATCH_WORKER_STALE_RETRY_DELAY", &c.MatchStaleRetryDelay},
+		{"RESULT_DEADLINE_POLL_INTERVAL", &c.ResultDeadlinePoll},
 	} {
 		if value := getenv(entry.key); value != "" {
 			d, err := time.ParseDuration(value)

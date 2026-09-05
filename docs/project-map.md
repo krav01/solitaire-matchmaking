@@ -7,18 +7,18 @@ or stage status change.
 | --- | --- | --- | --- |
 | Process entry | `cmd/server` | Load config, signals, logging, call application | Implemented |
 | Simulator | `internal/simulator`, `cmd/simulator` | Joint speed, timeout, fairness and calibration experiments | Stage 3 complete |
-| Application | `internal/application` | Compose resources and future use cases | Foundation implemented |
-| HTTP | `internal/httpapi` | Health, readiness, authenticated capability API | Implemented |
+| Application | `internal/application` | Compose ticket, matching and result use cases | Stage 4 in progress |
+| HTTP | `internal/httpapi` | Health, readiness, capabilities and authenticated result ingestion | Result endpoint implemented |
 | Configuration | `internal/config` | Validated environment configuration | Implemented |
-| PostgreSQL | `internal/postgres` | Pool, migrations, ticket lifecycle and leased matchmaking queue | Stage 4 in progress |
-| Tournament | `internal/tournament` | Versioned lifecycle contracts and ticket use cases | Stage 4 in progress |
-| Workers | `internal/worker` | Bounded matchmaking claims, fair processing, retries and ticket expiry | Matchmaking worker implemented |
+| PostgreSQL | `internal/postgres` | Pool, migrations, ticket/match queues and atomic result finalization | Stage 4 in progress |
+| Tournament | `internal/tournament` | Versioned ticket, result and deadline lifecycle contracts | Stage 4 in progress |
+| Workers | `internal/worker` | Bounded matchmaking claims, retries and result-deadline expiry | Matchmaking and deadline workers implemented |
 | Observability | `internal/observability` | Structured process logging | Foundation implemented |
 | Rating | `pkg/rating` | Baseline updates, placement predictions and calibration contracts | Stage 2 complete |
 | Matching | `pkg/matchmaking` | Bounded fair selection and deterministic retry scheduling | Stage 3 complete |
-| Current API | `api/openapi.yaml` | Machine-readable implemented endpoints | Implemented |
-| Planned API | `docs/api-contract.md` | Integration boundary awaiting use cases | Draft |
-| Persistence | `migrations` | Embedded schema including ticket lifecycle and worker leases | Stage 4 in progress |
+| Current API | `api/openapi.yaml` | Machine-readable health, capability and result endpoints | Implemented |
+| Planned API | `docs/api-contract.md` | Remaining ticket, room and rating integration boundary | Draft |
+| Persistence | `migrations` | Embedded schema including ticket, worker and result invariants | Stage 4 in progress |
 
 ## Dependency direction
 
