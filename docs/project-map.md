@@ -15,7 +15,7 @@ or stage status change.
 | Workers | `internal/worker` | Bounded matchmaking, deadline expiry, ordered rating and outbox delivery | Stage 4 workers implemented |
 | Event delivery | `internal/eventdelivery` | Authenticated, idempotent HTTPS publication to the game backend | Implemented |
 | Observability | `internal/observability` | Structured process logging | Foundation implemented |
-| Rating | `pkg/rating` | Baseline updates, placement predictions and calibration contracts | Persisted by stage-4 worker |
+| Rating | `pkg/rating` | Baseline rating plus version-bound raw feature encoding | Stage 5 feature contract implemented; baseline active |
 | Matching | `pkg/matchmaking` | Bounded fair selection and deterministic retry scheduling | Stage 3 complete |
 | Current API | `api/openapi.yaml` | Machine-readable health, capability and result endpoints | Implemented |
 | Planned API | `docs/api-contract.md` | Remaining ticket, room and rating integration boundary | Draft |

@@ -40,8 +40,8 @@
 
 ## Stage 5 — Extended rating
 
-- feature definitions aligned with scoring-rule and deck versions
-- missing-value and correlated-feature handling
+- [x] feature definitions aligned with scoring-rule and deck versions
+- [x] missing-value and correlated-feature handling
 - time-ordered training and holdout evaluation
 - baseline comparison, segment checks and version activation/rollback
 

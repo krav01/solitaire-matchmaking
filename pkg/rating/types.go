@@ -52,6 +52,25 @@ type Features struct {
 	RevealedCards *int64 `json:"revealed_cards,omitempty"`
 }
 
+// Validate rejects observations that cannot describe a completed solitaire
+// game. Score is intentionally allowed to be negative because its range belongs
+// to the referenced scoring-rules version.
+func (f Features) Validate() error {
+	if f.ElapsedMillis != nil && *f.ElapsedMillis < 0 {
+		return errors.New("elapsed milliseconds must be non-negative")
+	}
+	if f.Moves != nil && *f.Moves < 0 {
+		return errors.New("moves must be non-negative")
+	}
+	if f.UndoMoves != nil && *f.UndoMoves < 0 {
+		return errors.New("undo moves must be non-negative")
+	}
+	if f.RevealedCards != nil && *f.RevealedCards < 0 {
+		return errors.New("revealed cards must be non-negative")
+	}
+	return nil
+}
+
 // ParticipantResult is an observation in a finalized room. Place is one-based;
 // tie handling is determined by the referenced scoring-rules version.
 type ParticipantResult struct {
@@ -98,6 +117,9 @@ func (r MatchResult) Validate() error {
 		players[participant.PlayerID] = struct{}{}
 		if participant.Place < 1 || participant.Place > len(r.Participants) {
 			return fmt.Errorf("rating result place for player %q is outside the room", participant.PlayerID)
+		}
+		if err := participant.Features.Validate(); err != nil {
+			return fmt.Errorf("rating result features for player %q: %w", participant.PlayerID, err)
 		}
 		hasWinner = hasWinner || participant.Place == 1
 	}
