@@ -29,7 +29,7 @@ security:
 	$(GO) run golang.org/x/vuln/cmd/govulncheck@v1.7.0 ./...
 
 integration:
-	$(GO) test -count=1 -run '^Test(MigrationsApplyToPostgreSQL|OutboxDeliveryPostgreSQL|TicketLifecyclePostgreSQL|MatchmakingWorkerPostgreSQL|ResultFinalizationPostgreSQL|RatingWorkerPostgreSQL)$$' ./internal/postgres
+	$(GO) test -count=1 -run '^Test(MigrationsApplyToPostgreSQL|OutboxDeliveryPostgreSQL|TicketLifecyclePostgreSQL|MatchmakingWorkerPostgreSQL|ResultFinalizationPostgreSQL|RatingWorkerPostgreSQL|TournamentLifecyclePostgreSQLEndToEnd)$$' ./internal/postgres
 
 migrate:
 	$(GO) run ./cmd/migrate

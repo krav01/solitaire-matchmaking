@@ -20,7 +20,9 @@ room; a bounded deadline worker expires rooms that never receive a timely result
 A lease-fenced rating worker processes verified results in availability order and
 atomically persists rating history, current estimates and `result.rated` outbox
 events. A bounded outbox worker now publishes committed events to the game
-backend with aggregate ordering, fenced leases and capped retries.
+backend with aggregate ordering, fenced leases and capped retries. PostgreSQL 18
+integration now verifies the complete path from five accepted tickets through
+room completion, rating persistence and authenticated event delivery.
 
 ## Architecture
 
