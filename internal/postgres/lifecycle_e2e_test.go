@@ -74,7 +74,7 @@ func TestTournamentLifecyclePostgreSQLEndToEnd(t *testing.T) {
 		}
 	}
 
-	evaluatedAt := time.Now().UTC()
+	evaluatedAt := time.Now().UTC().Add(-2 * time.Second)
 	for round := range 10 {
 		claims := claimConcurrently(t, ctx, matchQueue, prefix, round, evaluatedAt)
 		processClaims(t, ctx, processor, claims, evaluatedAt)
