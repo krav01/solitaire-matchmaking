@@ -37,7 +37,7 @@ Required:
 - architecture guard;
 - PostgreSQL integration suite when persistence is involved;
 - `govulncheck`;
-- dependency review for pull requests;
+- Dependabot/dependency changes reviewed;
 - relevant fuzz/property checks for invariant-heavy input spaces;
 - benchmark review for critical-path performance changes.
 
@@ -95,9 +95,10 @@ The repository CI keeps independent jobs for:
 4. lint/static analysis;
 5. architecture dependency checks;
 6. reachable-vulnerability scanning;
-7. pull-request dependency review;
-8. full race detection on `main`;
-9. critical-path benchmark measurement on `main`.
+7. full race detection on `main`;
+8. critical-path benchmark measurement on `main`.
+
+GitHub Dependency Review should become an additional blocking PR gate after the repository Dependency Graph is enabled. Until then, dependency protection relies on Dependabot plus `govulncheck` and manual review of dependency changes.
 
 This keeps PR feedback relatively cheap while retaining heavier release-quality checks after merge to `main`.
 
