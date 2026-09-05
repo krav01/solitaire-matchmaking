@@ -1,0 +1,9 @@
+# Default repository owner. This file documents ownership; enforcement belongs to GitHub branch/ruleset settings.
+* @krav01
+
+# High-risk areas
+/pkg/matchmaking/ @krav01
+/pkg/rating/ @krav01
+/internal/postgres/ @krav01
+/internal/worker/ @krav01
+/.github/ @krav01
