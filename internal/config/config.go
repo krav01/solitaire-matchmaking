@@ -154,6 +154,9 @@ func Load(getenv func(string) string) (Config, error) {
 	if len(c.OutboxDeliveryToken) < 32 || strings.ContainsAny(c.OutboxDeliveryToken, " \r\n\t") {
 		return Config{}, errors.New("OUTBOX_DELIVERY_TOKEN must contain at least 32 characters without whitespace")
 	}
+	if c.APIToken == c.OutboxDeliveryToken {
+		return Config{}, errors.New("API_TOKEN and OUTBOX_DELIVERY_TOKEN must be distinct")
+	}
 	_, port, err := net.SplitHostPort(c.HTTPAddr)
 	if err != nil {
 		return Config{}, errors.New("HTTP_ADDR must be a host:port address")

@@ -37,6 +37,7 @@ Required:
 - vulnerability/dependency review;
 - failure scenarios documented/tested;
 - performance impact measured for critical paths;
+- deployable container and operator documentation verified for a release;
 - ADR update when the durable architecture decision changes.
 
 ## Task-specific completion

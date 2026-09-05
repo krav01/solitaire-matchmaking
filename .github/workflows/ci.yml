@@ -37,6 +37,8 @@ jobs:
         run: go mod tidy && git diff --exit-code -- go.mod go.sum
       - name: Build
         run: go build ./...
+      - name: Verify non-root container image
+        run: make container
       - name: Test with race detector
         run: go test -race -shuffle=on -coverprofile=coverage.out ./...
 

@@ -27,6 +27,7 @@ func TestLoad(t *testing.T) {
 		{name: "short API token", values: map[string]string{"API_TOKEN": "short"}, wantErr: true},
 		{name: "missing outbox URL", values: map[string]string{"OUTBOX_DELIVERY_URL": ""}, wantErr: true},
 		{name: "short outbox token", values: map[string]string{"OUTBOX_DELIVERY_TOKEN": "short"}, wantErr: true},
+		{name: "reused API token", values: map[string]string{"OUTBOX_DELIVERY_TOKEN": strings.Repeat("x", 32)}, wantErr: true},
 		{name: "invalid listen port", values: map[string]string{"HTTP_ADDR": "127.0.0.1:70000"}, wantErr: true},
 		{name: "unbounded connection pool", values: map[string]string{"DB_MAX_CONNS": "1001"}, wantErr: true},
 		{name: "long readiness timeout", values: map[string]string{"READINESS_TIMEOUT": "6s"}, wantErr: true},

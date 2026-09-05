@@ -18,6 +18,7 @@ Validate data at the boundary before it reaches domain logic. Reject malformed, 
 - Never commit credentials, tokens, private keys, production secrets, or real customer data.
 - `.env.example` must contain placeholders only.
 - Secrets must come from the deployment environment or an external secret manager.
+- Inbound `API_TOKEN` and outbound `OUTBOX_DELIVERY_TOKEN` must be distinct.
 - Do not write authorization credentials, connection strings containing passwords, or raw sensitive payloads to logs.
 - Treat player identifiers, rating snapshots, tournament participation, and operational telemetry as sensitive service data.
 
@@ -55,8 +56,14 @@ Pull requests and release changes are checked with:
 - `govulncheck` for reachable Go vulnerabilities;
 - GitHub dependency review for newly introduced vulnerable dependencies;
 - Dependabot for Go modules and GitHub Actions updates.
+- a container build check that verifies the non-root runtime user.
 
 New runtime dependencies require a clear reason. Prefer the standard library where it provides an adequate solution.
+
+The current release assessment, accepted residual risks, and re-review triggers
+are recorded in `docs/security-review.md`. Deployment controls that cannot be
+enforced inside this process are required by `docs/deployment.md` and
+`docs/release-checklist.md`.
 
 ## Incident checklist
 

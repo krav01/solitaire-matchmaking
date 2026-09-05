@@ -93,7 +93,7 @@ func New(check Readiness, tickets TicketManager, results ResultFinalizer, querie
 			return
 		}
 		s.respond(w, r, http.StatusOK, map[string]any{
-			"service": "solitaire-matchmaking", "stage": "operational_observability",
+			"service": "solitaire-matchmaking", "stage": "release_candidate",
 			"rating_enabled": true, "matchmaking_enabled": true, "ticket_lifecycle_enabled": true,
 			"result_ingestion_enabled": true,
 			"outbox_delivery_enabled":  true,

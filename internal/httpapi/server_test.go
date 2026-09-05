@@ -93,7 +93,7 @@ func TestServerCapabilitiesRequireAuthentication(t *testing.T) {
 				if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
 					t.Fatalf("decode capabilities: %v", err)
 				}
-				if body.Stage != "operational_observability" || !body.RatingEnabled ||
+				if body.Stage != "release_candidate" || !body.RatingEnabled ||
 					!body.TicketLifecycleEnabled || !body.OutboxDeliveryEnabled || !body.MetricsEnabled {
 					t.Fatalf("capabilities = %+v", body)
 				}

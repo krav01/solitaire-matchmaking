@@ -90,7 +90,7 @@ paths:
                 $ref: "#/components/schemas/Capabilities"
               example:
                 service: solitaire-matchmaking
-                stage: operational_observability
+                stage: release_candidate
                 rating_enabled: true
                 matchmaking_enabled: true
                 ticket_lifecycle_enabled: true
@@ -561,7 +561,7 @@ components:
           const: solitaire-matchmaking
         stage:
           type: string
-          const: operational_observability
+          const: release_candidate
         rating_enabled:
           type: boolean
           const: true

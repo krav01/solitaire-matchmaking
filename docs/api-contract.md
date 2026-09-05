@@ -19,6 +19,9 @@ The implemented inbound API and outbound webhook envelope are defined in
 | GET /v1/ratings/{player_id}?mode_id=... | API_TOKEN bearer | Read the current persisted rating |
 | POST /v1/results | API_TOKEN bearer | Complete, server-verified room result |
 
+The authenticated capability response reports `stage: release_candidate` for
+this completed Stage 6 integration surface.
+
 Ticket acceptance uses `entry_id` as its idempotency identity. The game backend
 must persist the request, including `requested_at` and the pre-game rating
 snapshot, before sending it. The initial request returns 201; an identical retry
