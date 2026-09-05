@@ -71,8 +71,8 @@ func New(check Readiness, results ResultFinalizer, logger *slog.Logger, opts Opt
 			return
 		}
 		s.respond(w, r, http.StatusOK, map[string]any{
-			"service": "solitaire-matchmaking", "stage": "result_finalization",
-			"rating_enabled": false, "matchmaking_enabled": true, "result_ingestion_enabled": true,
+			"service": "solitaire-matchmaking", "stage": "baseline_rating_persistence",
+			"rating_enabled": true, "matchmaking_enabled": true, "result_ingestion_enabled": true,
 			"planned_room_sizes": []int{5, 6, 7},
 		})
 	})

@@ -17,7 +17,9 @@ room assignment. A bounded, lease-fenced worker now performs fair room selection
 fast stale-room retries and transactional ticket expiry. The authenticated result
 endpoint validates complete authoritative standings and atomically completes a
 room; a bounded deadline worker expires rooms that never receive a timely result.
-Time-ordered rating processing and outbox delivery remain in progress.
+A lease-fenced rating worker processes verified results in availability order and
+atomically persists rating history, current estimates and `result.rated` outbox
+events. Retryable outbox delivery remains in progress.
 
 ## Architecture
 
@@ -71,6 +73,9 @@ Neither setting changes the policy's hard fairness limits.
 
 Result-deadline scans default to 32 rooms once per second. The
 `RESULT_DEADLINE_*` variables bound this work independently of matchmaking.
+Rating processing uses one global ordered claim, a 100 ms poll interval and a
+10 second lease. The `RATING_WORKER_*` variables tune reliability and latency;
+they do not permit later results to overtake the oldest unprocessed result.
 
 ```bash
 curl http://127.0.0.1:8080/healthz

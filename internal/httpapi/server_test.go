@@ -81,6 +81,18 @@ func TestServerCapabilitiesRequireAuthentication(t *testing.T) {
 			if response.Code != tt.want {
 				t.Fatalf("status = %d, want %d", response.Code, tt.want)
 			}
+			if tt.want == http.StatusOK {
+				var body struct {
+					Stage         string `json:"stage"`
+					RatingEnabled bool   `json:"rating_enabled"`
+				}
+				if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
+					t.Fatalf("decode capabilities: %v", err)
+				}
+				if body.Stage != "baseline_rating_persistence" || !body.RatingEnabled {
+					t.Fatalf("capabilities = %+v", body)
+				}
+			}
 		})
 	}
 }
