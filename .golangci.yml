@@ -7,6 +7,7 @@ linters:
   default: none
   enable:
     - bodyclose
+    - contextcheck
     - errcheck
     - errorlint
     - exhaustive
@@ -16,6 +17,7 @@ linters:
     - ineffassign
     - misspell
     - nilerr
+    - nolintlint
     - staticcheck
     - unconvert
     - unused
