@@ -135,6 +135,6 @@ func Run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 		stopWorker()
 		workers.Wait()
 	}()
-	logger.Info("server started", "address", listener.Addr().String(), "stage", "transactional_event_delivery")
+	logger.Info("server started", "address", listener.Addr().String(), "stage", "release_candidate")
 	return server.Serve(ctx, listener)
 }

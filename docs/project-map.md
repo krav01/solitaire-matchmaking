@@ -20,7 +20,7 @@ or stage status change.
 | Current API | `api/openapi.yaml` | Machine-readable operational, ticket, room, rating, result and outbound event contracts | Integration surface implemented |
 | Integration | `docs/api-contract.md`, `examples/game-backend` | API contract, event payload catalogue, retry rules and tested Go receiver | Stage 6 release candidate complete |
 | Persistence | `migrations` | Embedded schema including ticket, worker, result and outbox invariants | Stage 4 complete |
-| Engineering guardrails | `.github`, `scripts/check-architecture.sh`, `docs/definition-of-done.md`, `docs/resilience-testing.md` | Risk-based review, dependency, architecture, resilience, fuzz, race, lint and security checks | Enforced in CI |
+| Engineering guardrails | `.github`, `CONTRIBUTING.md`, `SECURITY.md`, `scripts/check-architecture.sh`, `docs/definition-of-done.md`, `docs/resilience-testing.md` | Contribution and disclosure policy plus risk-based dependency, architecture, resilience, fuzz, race, lint and security checks | Enforced in CI |
 | Release operations | `docs/deployment.md`, `docs/security-review.md`, `docs/release-checklist.md` | Immutable deployment, security acceptance, migration, canary and rollback procedure | Release candidate ready |
 
 ## Dependency direction

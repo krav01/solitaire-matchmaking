@@ -1,5 +1,5 @@
-// Package httpapi exposes implemented service endpoints. Business endpoints are
-// documented as planned and are deliberately not registered by the foundation.
+// Package httpapi exposes the service's health, observability, ticket, room,
+// rating, and authoritative-result endpoints.
 package httpapi
 
 import (
@@ -20,7 +20,7 @@ import (
 	"github.com/krav01/solitaire-matchmaking/internal/tournament"
 )
 
-// Readiness is implemented by the PostgreSQL pool and extended at later stages.
+// Readiness is implemented by the PostgreSQL pool.
 type Readiness interface{ Ping(context.Context) error }
 
 type ResultFinalizer interface {
