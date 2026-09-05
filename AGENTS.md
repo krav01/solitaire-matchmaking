@@ -42,7 +42,7 @@ Always load `samber/cc-skills-golang@golang-how-to` (or its installed equivalent
 - Parameterize SQL. Persist state transitions and outgoing events atomically when persistence is implemented.
 - Follow `docs/migration-safety.md` for schema changes; prefer expand/contract migrations and review lock/compatibility risk.
 - Do not log secrets or authentication material. Treat player identifiers and telemetry as sensitive operational data.
-- New dependencies must pass dependency review and `govulncheck`; justify dependencies that expand the attack surface.
+- New dependencies must pass `govulncheck` and Dependabot review; enable GitHub Dependency Review as a blocking gate once the repository Dependency Graph is available.
 
 ## Failure and observability design
 
