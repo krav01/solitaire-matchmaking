@@ -102,3 +102,10 @@ GitHub Dependency Review is an additional PR gate for newly introduced vulnerabl
 This keeps correctness gates before merge while reserving comparative benchmark measurement for `main`.
 
 A failed gate should be fixed rather than bypassed with broad exclusions. Any necessary suppression must be narrow and documented.
+
+## Resilience scenarios
+
+The PostgreSQL CI job includes deterministic load, recovery, and publisher
+failure-injection scenarios for the transactional outbox. The scenario matrix,
+pass criteria, local command, and production coverage boundaries are documented
+in `docs/resilience-testing.md`.

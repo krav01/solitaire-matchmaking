@@ -112,6 +112,8 @@ jobs:
         run: go test -count=1 -run '^TestResultFinalizationPostgreSQL$' ./internal/postgres
       - name: Test complete tournament lifecycle
         run: go test -count=1 -run '^TestTournamentLifecyclePostgreSQLEndToEnd$' ./internal/postgres
+      - name: Test load, recovery and failure injection
+        run: go test -count=1 -run '^TestOutboxResiliencePostgreSQL$' ./internal/postgres
 
   lint:
     name: Lint
