@@ -29,8 +29,23 @@ jobs:
         run: go mod tidy && git diff --exit-code -- go.mod go.sum
       - name: Build
         run: go build ./...
-      - name: Test with race detector
-        run: go test -race -shuffle=on -coverprofile=coverage.out ./...
+      - name: Run tests
+        run: go test -shuffle=on -coverprofile=coverage.out ./...
+
+  architecture:
+    name: Architecture
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Check package boundaries
+        run: bash scripts/check-architecture.sh
 
   postgres:
     name: PostgreSQL integration
@@ -96,3 +111,19 @@ jobs:
           cache: true
       - name: Run govulncheck
         run: go run golang.org/x/vuln/cmd/govulncheck@v1.7.0 ./...
+
+  race:
+    name: Race detector
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Run full race suite
+        run: go test -race -shuffle=on ./...
