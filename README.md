@@ -106,5 +106,8 @@ make check
 make security
 ```
 
-The current API is documented in [`api/openapi.yaml`](api/openapi.yaml). Planned
-integration contracts are listed in [`docs/api-contract.md`](docs/api-contract.md).
+The current API and outbound webhook are documented in
+[`api/openapi.yaml`](api/openapi.yaml). Retry rules, event payload fields and the
+remaining HTTP surface are listed in [the integration contract](docs/api-contract.md).
+Run the [game-backend example](examples/game-backend/README.md) to exercise
+authenticated event delivery and in-process deduplication.

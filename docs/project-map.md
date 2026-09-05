@@ -18,7 +18,7 @@ or stage status change.
 | Rating | `pkg/rating` | Baseline, versioned feature evaluation, model comparison and rollout contracts | Stage 5 complete; baseline active pending real evidence |
 | Matching | `pkg/matchmaking` | Bounded fair selection and deterministic retry scheduling | Stage 3 complete |
 | Current API | `api/openapi.yaml` | Machine-readable health, capability and result endpoints | Implemented |
-| Planned API | `docs/api-contract.md` | Remaining ticket, room and rating integration boundary | Draft |
+| Integration | `docs/api-contract.md`, `examples/game-backend` | Event payload catalogue, retry rules, tested Go receiver and remaining HTTP boundary | Stage 6 in progress |
 | Persistence | `migrations` | Embedded schema including ticket, worker, result and outbox invariants | Stage 4 complete |
 
 ## Dependency direction
