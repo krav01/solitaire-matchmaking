@@ -22,7 +22,9 @@ atomically persists rating history, current estimates and `result.rated` outbox
 events. A bounded outbox worker now publishes committed events to the game
 backend with aggregate ordering, fenced leases and capped retries. PostgreSQL 18
 integration now verifies the complete path from five accepted tickets through
-room completion, rating persistence and authenticated event delivery.
+room completion, rating persistence and authenticated event delivery. Stage 5
+adds version-bound raw feature encoding with explicit missing-value and
+correlation guards; the placement-only baseline remains active.
 
 ## Architecture
 

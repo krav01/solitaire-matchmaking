@@ -50,6 +50,28 @@ prevents aggregation across model versions, modes, scoring rules or room sizes.
 It reports multiclass Brier score, mean log loss and binned expected calibration
 error for the full placement distribution.
 
+## Extended feature contract
+
+Extended-model inputs are extracted by an immutable feature schema bound to one
+mode, scoring-rules version and deck version. A changed context or definition set
+requires a new schema version, and incompatible results are rejected instead of
+being mixed into one dataset.
+
+The encoder emits raw observations in schema order and players in identifier
+order. Every observation carries a `present` flag, so an unavailable value is
+never imputed as an observed zero. Integer observations outside the exact
+`float64` range are rejected rather than silently rounded.
+
+Each selected feature belongs to an exclusive signal family. A schema cannot
+select two members of one family, and `score` can never be combined with
+`elapsed_ms` because scoring rules may already include time. The schema therefore
+prevents obvious double counting without inventing EasyWin-specific weights.
+
+Statistical scaling, imputation policy and weights will be fitted only from a
+time-ordered training partition in the next stage-5 slice. The placement-only
+baseline remains the active rating model until an extended version passes
+holdout and segment comparisons.
+
 ## Current limits
 
 - The approximation treats pairwise placement comparisons as independent.
