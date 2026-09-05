@@ -67,10 +67,33 @@ select two members of one family, and `score` can never be combined with
 `elapsed_ms` because scoring rules may already include time. The schema therefore
 prevents obvious double counting without inventing EasyWin-specific weights.
 
-Statistical scaling, imputation policy and weights will be fitted only from a
-time-ordered training partition in the next stage-5 slice. The placement-only
-baseline remains the active rating model until an extended version passes
-holdout and segment comparisons.
+Statistical scaling is fitted only from a time-ordered training partition as
+described below. No imputation or feature weights are introduced at this stage.
+The placement-only baseline remains the active rating model until an extended
+version passes holdout and segment comparisons.
+
+## Time-ordered datasets and holdout
+
+Feature batches retain result finish and availability timestamps. Dataset
+splitting uses availability: results available at or before the training cutoff
+form the training partition, while strictly later results form holdout. Both
+partitions are non-empty, deterministically ordered and restricted to one feature
+schema, mode, scoring-rules version, deck version and feature layout. Duplicate
+events and rooms are rejected.
+
+Standardization statistics are fitted only through the split's private training
+partition using present observations. Missing observations neither contribute to
+the mean and population standard deviation nor become zero-valued samples; their
+presence mask remains false after transformation. Constant training features
+remain centered at zero with a unit transform scale.
+
+Holdout calibration records both the dataset cutoff and the model's declared
+training horizon. It rejects a model trained past the cutoff and any evaluated
+result already available by that cutoff. A prediction cannot predate its model's
+training horizon. The evaluator then applies the existing placement calibration
+metrics. Real verified outcomes are still required for accuracy claims; these
+contracts and deterministic tests establish leakage prevention, not predictive
+gain.
 
 ## Current limits
 

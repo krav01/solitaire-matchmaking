@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"time"
 )
 
 // FeatureName identifies one verified gameplay observation.
@@ -60,10 +61,13 @@ type PlayerFeatureVector struct {
 type FeatureBatch struct {
 	SchemaVersion       string                `json:"schema_version"`
 	EventID             string                `json:"event_id"`
+	RoomID              string                `json:"room_id"`
 	ModeID              string                `json:"mode_id"`
 	ScoringRulesVersion string                `json:"scoring_rules_version"`
 	DeckVersion         string                `json:"deck_version"`
 	DeckID              string                `json:"deck_id"`
+	FinishedAt          time.Time             `json:"finished_at"`
+	AvailableAt         time.Time             `json:"available_at"`
 	Players             []PlayerFeatureVector `json:"players"`
 }
 
@@ -133,10 +137,13 @@ func (e *FeatureEncoder) Encode(result MatchResult, context FeatureContext) (Fea
 	return FeatureBatch{
 		SchemaVersion:       e.schema.Version,
 		EventID:             result.EventID,
+		RoomID:              result.RoomID,
 		ModeID:              result.ModeID,
 		ScoringRulesVersion: result.ScoringRulesVersion,
 		DeckVersion:         context.DeckVersion,
 		DeckID:              result.DeckID,
+		FinishedAt:          result.FinishedAt,
+		AvailableAt:         result.AvailableAt,
 		Players:             players,
 	}, nil
 }

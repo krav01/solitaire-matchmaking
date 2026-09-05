@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"time"
 )
 
 const (
@@ -39,6 +40,50 @@ type CalibrationReport struct {
 	MeanLogLoss              float64          `json:"mean_log_loss"`
 	ExpectedCalibrationError float64          `json:"expected_calibration_error"`
 	Bins                     []CalibrationBin `json:"bins"`
+}
+
+// HoldoutCalibrationConfig records the boundary used to train a frozen model.
+type HoldoutCalibrationConfig struct {
+	TrainingCutoff      time.Time `json:"training_cutoff"`
+	ModelTrainedThrough time.Time `json:"model_trained_through"`
+	BinCount            int       `json:"bin_count"`
+}
+
+// HoldoutCalibrationReport keeps the anti-leakage boundary beside its metrics.
+type HoldoutCalibrationReport struct {
+	TrainingCutoff      time.Time         `json:"training_cutoff"`
+	ModelTrainedThrough time.Time         `json:"model_trained_through"`
+	Calibration         CalibrationReport `json:"calibration"`
+}
+
+// EvaluateHoldoutCalibration evaluates only results that became available after
+// the training cutoff and rejects a model trained beyond that boundary.
+func EvaluateHoldoutCalibration(observations []CalibrationObservation, config HoldoutCalibrationConfig) (HoldoutCalibrationReport, error) {
+	if config.TrainingCutoff.IsZero() || config.ModelTrainedThrough.IsZero() {
+		return HoldoutCalibrationReport{}, errors.New("holdout training cutoff and model training time are required")
+	}
+	if config.ModelTrainedThrough.After(config.TrainingCutoff) {
+		return HoldoutCalibrationReport{}, errors.New("holdout model cannot be trained beyond the training cutoff")
+	}
+	for index, observation := range observations {
+		if !observation.Result.AvailableAt.After(config.TrainingCutoff) {
+			return HoldoutCalibrationReport{}, fmt.Errorf("holdout observation %d was available by the training cutoff", index)
+		}
+		if observation.Prediction.GeneratedAt.Before(config.ModelTrainedThrough) {
+			return HoldoutCalibrationReport{}, fmt.Errorf("holdout observation %d prediction predates the model training horizon", index)
+		}
+	}
+
+	report, err := EvaluateCalibration(observations, config.BinCount)
+	if err != nil {
+		return HoldoutCalibrationReport{}, err
+	}
+
+	return HoldoutCalibrationReport{
+		TrainingCutoff:      config.TrainingCutoff,
+		ModelTrainedThrough: config.ModelTrainedThrough,
+		Calibration:         report,
+	}, nil
 }
 
 // EvaluateCalibration scores placement distributions against later outcomes.

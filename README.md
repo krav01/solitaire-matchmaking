@@ -24,7 +24,8 @@ backend with aggregate ordering, fenced leases and capped retries. PostgreSQL 18
 integration now verifies the complete path from five accepted tickets through
 room completion, rating persistence and authenticated event delivery. Stage 5
 adds version-bound raw feature encoding with explicit missing-value and
-correlation guards; the placement-only baseline remains active.
+correlation guards, training-only standardization and time-ordered holdout
+calibration; the placement-only baseline remains active.
 
 ## Architecture
 
