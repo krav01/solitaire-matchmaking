@@ -11,6 +11,7 @@ import (
 	"github.com/krav01/solitaire-matchmaking/internal/config"
 	"github.com/krav01/solitaire-matchmaking/internal/eventdelivery"
 	"github.com/krav01/solitaire-matchmaking/internal/httpapi"
+	"github.com/krav01/solitaire-matchmaking/internal/observability"
 	"github.com/krav01/solitaire-matchmaking/internal/postgres"
 	"github.com/krav01/solitaire-matchmaking/internal/tournament"
 	"github.com/krav01/solitaire-matchmaking/internal/worker"
@@ -44,14 +45,19 @@ func Run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	if err != nil {
 		return err
 	}
+	metrics, err := observability.NewMetrics()
+	if err != nil {
+		return err
+	}
 	server, err := httpapi.New(pool, ticketService, resultService, queryStore, logger, httpapi.Options{
 		APIToken: cfg.APIToken, ReadinessTimeout: cfg.ReadinessTimeout, ShutdownTimeout: cfg.ShutdownTimeout,
+		Metrics: metrics,
 	})
 	if err != nil {
 		return err
 	}
 	deadlineRunner, err := worker.NewResultDeadlineRunner(resultService, logger, worker.ResultDeadlineOptions{
-		BatchSize: cfg.ResultDeadlineBatch, PollInterval: cfg.ResultDeadlinePoll,
+		BatchSize: cfg.ResultDeadlineBatch, PollInterval: cfg.ResultDeadlinePoll, Observer: metrics,
 	})
 	if err != nil {
 		return err
@@ -62,7 +68,7 @@ func Run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	}
 	ratingRunner, err := worker.NewRatingRunner(ratingQueue, logger, worker.RatingRunnerOptions{
 		LeaseDuration: cfg.RatingLease, PollInterval: cfg.RatingPollInterval,
-		FailureBackoff: cfg.RatingFailureBackoff,
+		FailureBackoff: cfg.RatingFailureBackoff, Observer: metrics,
 	})
 	if err != nil {
 		return err
@@ -71,14 +77,14 @@ func Run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	if err != nil {
 		return err
 	}
-	processor, err := worker.NewMatchProcessor(matchQueue, matchQueue, ticketService, cfg.MatchStaleRetryDelay)
+	processor, err := worker.NewMatchProcessor(matchQueue, matchQueue, ticketService, cfg.MatchStaleRetryDelay, metrics)
 	if err != nil {
 		return err
 	}
 	runner, err := worker.NewRunner(matchQueue, processor, logger, worker.RunnerOptions{
 		BatchSize: cfg.MatchBatchSize, Concurrency: cfg.MatchConcurrency,
 		LeaseDuration: cfg.MatchLease, PollInterval: cfg.MatchPollInterval,
-		FailureBackoff: cfg.MatchFailureBackoff,
+		FailureBackoff: cfg.MatchFailureBackoff, Observer: metrics,
 	})
 	if err != nil {
 		return err
@@ -97,6 +103,7 @@ func Run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 		BatchSize: cfg.OutboxBatchSize, Concurrency: cfg.OutboxConcurrency,
 		LeaseDuration: cfg.OutboxLease, PollInterval: cfg.OutboxPollInterval,
 		RetryBaseDelay: cfg.OutboxRetryBaseDelay, RetryMaxDelay: cfg.OutboxRetryMaxDelay,
+		Observer: metrics,
 	})
 	if err != nil {
 		return err

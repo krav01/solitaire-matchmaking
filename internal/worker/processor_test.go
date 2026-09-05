@@ -83,6 +83,50 @@ func TestMatchProcessorPersistsEveryMatcherOutcome(t *testing.T) {
 			t.Fatalf("assignment = %+v, retry = %v", lifecycle.assign, queue.retryAt)
 		}
 	})
+
+	t.Run("successful room fill", func(t *testing.T) {
+		queue := &processorQueue{}
+		lifecycle := &processorLifecycle{}
+		observer := &matchObserverStub{}
+		members := make([]matchmaking.Candidate, 4)
+		for index := range members {
+			members[index] = processorCandidate(string(rune('a'+index)), now.Add(-20*time.Second))
+		}
+		attempt := matchmaking.MatchAttempt{
+			Trigger: matchmaking.AttemptTriggerPeriodicRetry, EvaluatedAt: now,
+			Candidate: candidate, Policy: policy,
+			Rooms: []matchmaking.RoomView{{
+				RoomID: "room-1", ModeID: "solitaire", AggregateVersion: 7,
+				Capacity: 5, CreatedAt: now.Add(-20 * time.Second),
+				Deadline: now.Add(10 * time.Second), Policy: policy, Members: members,
+			}},
+		}
+		processor, err := NewMatchProcessor(
+			processorAttemptStore{attempt: attempt}, queue, lifecycle, 50*time.Millisecond, observer,
+		)
+		if err != nil {
+			t.Fatalf("NewMatchProcessor() error = %v", err)
+		}
+		observedClaim := claim
+		observedClaim.Ticket.RequestedAt = candidate.JoinedAt
+		if err := processor.Handle(context.Background(), observedClaim, now); err != nil {
+			t.Fatalf("Handle() error = %v", err)
+		}
+		observation := observer.observation
+		if observation.Outcome != matchmaking.AttemptOutcomeMatched || observation.ModeID != "solitaire" ||
+			observation.Capacity != 5 || !observation.RoomFilled || observation.RoomFillDuration != 20*time.Second ||
+			observation.AssignmentLatency != 10*time.Second || observation.WinProbabilitySpread == nil {
+			t.Fatalf("match observation = %+v", observation)
+		}
+	})
+}
+
+type matchObserverStub struct {
+	observation MatchObservation
+}
+
+func (observer *matchObserverStub) ObserveMatch(observation MatchObservation) {
+	observer.observation = observation
 }
 
 func newProcessorForTest(t *testing.T, attempt matchmaking.MatchAttempt, queue *processorQueue, lifecycle *processorLifecycle) *MatchProcessor {

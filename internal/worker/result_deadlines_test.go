@@ -13,8 +13,9 @@ import (
 func TestResultDeadlineRunnerUsesBoundedBatch(t *testing.T) {
 	t.Parallel()
 	service := &resultDeadlineServiceStub{rooms: []tournament.ExpiredRoom{{RoomID: "room-a"}, {RoomID: "room-b"}}}
+	observer := &workerObserverStub{}
 	runner, err := NewResultDeadlineRunner(service, slog.New(slog.NewTextHandler(io.Discard, nil)), ResultDeadlineOptions{
-		BatchSize: 7, PollInterval: time.Second,
+		BatchSize: 7, PollInterval: time.Second, Observer: observer,
 	})
 	if err != nil {
 		t.Fatalf("NewResultDeadlineRunner() error = %v", err)
@@ -27,6 +28,11 @@ func TestResultDeadlineRunnerUsesBoundedBatch(t *testing.T) {
 	}
 	if count != 2 || service.batch.Limit != 7 || !service.batch.ExpiredAt.Equal(now) {
 		t.Fatalf("RunOnce() count = %d, batch = %+v", count, service.batch)
+	}
+	if observer.observation != (WorkerCycleObservation{
+		Worker: WorkerResultDeadline, Claimed: 2, Succeeded: 2,
+	}) {
+		t.Fatalf("worker observation = %+v", observer.observation)
 	}
 }
 

@@ -89,3 +89,18 @@ before its acknowledgement is committed, the contract is at least once and the
 receiver must deduplicate `Idempotency-Key: <event_id>`. Redirects are disabled,
 remote clear-text HTTP is rejected, and delivery uses a credential distinct from
 the inbound API token.
+
+## ADR-008: Bounded operational metrics
+
+**Status:** accepted.
+
+Expose authenticated Prometheus/OpenMetrics data from the service process.
+Measure HTTP behavior by stable route, background work by fixed worker name, and
+room outcomes by mode, capacity, policy version and rating-model version. Never
+use player, ticket, room, event or request identities as metric labels.
+
+Record assignment and fill duration beside skill-gap and predicted-probability
+spread. Also expose each fairness measure relative to its immutable hard policy
+limit so dashboards and alerts remain meaningful across policy versions. Metrics
+observe only successfully persisted decisions; stale claims and failed mutations
+cannot appear as completed rooms.

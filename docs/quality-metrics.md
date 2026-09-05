@@ -60,6 +60,9 @@ Every report includes its workload and matching configuration for replay.
 Synthetic calibration measures consistency under known generated inputs; it
 does not support a claim about production prediction accuracy.
 
+Production instrumentation, label-cardinality rules, dashboard panels and alert
+semantics are defined in the [observability guide](observability.md).
+
 The current scenario assigns every arrival immediately: it joins an eligible
 forming room or opens a new one. Ticket-assignment latency is therefore zero and
 is not presented as a measured service result. Player wait still runs until the

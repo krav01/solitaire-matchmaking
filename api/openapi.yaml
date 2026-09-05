@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Solitaire Matchmaking API
-  version: 0.6.0
+  version: 0.7.0
   description: |
     Implemented HTTP endpoints and the outbound game-backend event contract.
     Every HTTP response includes `X-Request-ID`, `Cache-Control: no-store` and
@@ -55,6 +55,22 @@ paths:
               schema:
                 $ref: "#/components/schemas/Status"
               example: {status: not_ready}
+  /metrics:
+    get:
+      tags: [Operations]
+      summary: Scrape Prometheus and OpenMetrics data
+      operationId: getMetrics
+      security:
+        - apiBearerAuth: []
+      responses:
+        "200":
+          description: Go, process and bounded application metrics.
+          content:
+            text/plain:
+              schema:
+                type: string
+        "401":
+          $ref: "#/components/responses/Unauthorized"
   /v1/capabilities:
     get:
       tags: [Integration]
@@ -74,12 +90,13 @@ paths:
                 $ref: "#/components/schemas/Capabilities"
               example:
                 service: solitaire-matchmaking
-                stage: transactional_event_delivery
+                stage: operational_observability
                 rating_enabled: true
                 matchmaking_enabled: true
                 ticket_lifecycle_enabled: true
                 result_ingestion_enabled: true
                 outbox_delivery_enabled: true
+                metrics_enabled: true
                 planned_room_sizes: [5, 6, 7]
         "401":
           $ref: "#/components/responses/Unauthorized"
@@ -537,14 +554,14 @@ components:
     Capabilities:
       type: object
       additionalProperties: false
-      required: [service, stage, rating_enabled, matchmaking_enabled, ticket_lifecycle_enabled, result_ingestion_enabled, outbox_delivery_enabled, planned_room_sizes]
+      required: [service, stage, rating_enabled, matchmaking_enabled, ticket_lifecycle_enabled, result_ingestion_enabled, outbox_delivery_enabled, metrics_enabled, planned_room_sizes]
       properties:
         service:
           type: string
           const: solitaire-matchmaking
         stage:
           type: string
-          const: transactional_event_delivery
+          const: operational_observability
         rating_enabled:
           type: boolean
           const: true
@@ -558,6 +575,9 @@ components:
           type: boolean
           const: true
         outbox_delivery_enabled:
+          type: boolean
+          const: true
+        metrics_enabled:
           type: boolean
           const: true
         planned_room_sizes:

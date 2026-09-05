@@ -31,7 +31,9 @@ baseline remains active until a candidate passes real-data thresholds.
 Authenticated ticket endpoints now accept idempotent entries, cancel queued
 tickets and expose assignment state for game-backend polling. Read-only room and
 rating endpoints now expose lifecycle composition and the latest persisted,
-version-explicit player estimate for diagnostics and reconciliation.
+version-explicit player estimate for diagnostics and reconciliation. Authenticated
+Prometheus metrics, a Grafana dashboard and alert rules now cover fill speed,
+fairness guardrails, HTTP health and background-worker reliability.
 
 ## Architecture
 
@@ -97,6 +99,8 @@ curl http://127.0.0.1:8080/healthz
 curl http://127.0.0.1:8080/readyz
 curl -H "Authorization: Bearer $API_TOKEN" \
   http://127.0.0.1:8080/v1/capabilities
+curl -H "Authorization: Bearer $API_TOKEN" \
+  http://127.0.0.1:8080/metrics
 ```
 
 Ticket, room, rating and verified-result request/response schemas are documented in
@@ -115,3 +119,6 @@ The current API and outbound webhook are documented in
 listed in [the integration contract](docs/api-contract.md).
 Run the [game-backend example](examples/game-backend/README.md) to exercise
 authenticated event delivery and in-process deduplication.
+Import the supplied [Grafana dashboard](deploy/observability/grafana-dashboard.json)
+and [Prometheus alerts](deploy/observability/prometheus-alerts.yaml) as described
+in the [observability guide](docs/observability.md).
