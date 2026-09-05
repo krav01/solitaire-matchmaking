@@ -47,7 +47,8 @@
 
 ## Stage 6 — Integration and release validation
 
-- complete OpenAPI contract and game-backend example
+- [x] document implemented HTTP API, outbound envelope and game-backend receiver example
+- [ ] complete ticket/query HTTP adapters and end-to-end external onboarding contract
 - observability dashboards and alerts for speed, fairness and reliability
 - load, recovery and failure-injection scenarios
 - deployment guide, security review and release checklist

@@ -1,117 +1,330 @@
 openapi: 3.1.0
 info:
   title: Solitaire Matchmaking API
-  version: 0.3.0
-  description: Implemented service health, capability and verified-result endpoints.
+  version: 0.4.0
+  description: |
+    Implemented HTTP endpoints and the outbound game-backend event contract.
+    Every HTTP response includes `X-Request-ID`, `Cache-Control: no-store` and
+    `X-Content-Type-Options: nosniff` headers.
 servers:
   - url: http://127.0.0.1:8080
+    description: Local development
+tags:
+  - name: Operations
+  - name: Integration
 paths:
   /healthz:
     get:
+      tags: [Operations]
+      summary: Check process liveness
       operationId: getLiveness
       responses:
         "200":
           description: Process is alive.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestID"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Status"
+              example: {status: ok}
   /readyz:
     get:
+      tags: [Operations]
+      summary: Check service readiness
       operationId: getReadiness
       responses:
         "200":
           description: Service and PostgreSQL are ready.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestID"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Status"
+              example: {status: ready}
         "503":
           description: Service is draining or PostgreSQL is unavailable.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestID"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Status"
+              example: {status: not_ready}
   /v1/capabilities:
     get:
+      tags: [Integration]
+      summary: Read implemented service capabilities
       operationId: getCapabilities
       security:
-        - bearerAuth: []
+        - apiBearerAuth: []
       responses:
         "200":
-          description: Implemented and planned capabilities.
+          description: Current service capabilities.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestID"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Capabilities"
+              example:
+                service: solitaire-matchmaking
+                stage: transactional_event_delivery
+                rating_enabled: true
+                matchmaking_enabled: true
+                result_ingestion_enabled: true
+                outbox_delivery_enabled: true
+                planned_room_sizes: [5, 6, 7]
         "401":
-          description: Authentication failed.
+          $ref: "#/components/responses/Unauthorized"
   /v1/results:
     post:
+      tags: [Integration]
+      summary: Finalize an authoritative room result
       operationId: finalizeVerifiedResult
-      description: Finalize one complete, game-backend-verified room result before its deadline.
+      description: |
+        Finalizes one complete, game-backend-verified room result before its
+        deadline. `event_id` is the idempotency identity. Repeating the exact
+        logical request returns the stored result with `replay: true`; reusing
+        an event or room identity for different data returns a conflict.
+
+        The JSON body is limited to 1 MiB. Unknown fields are rejected. The
+        service records its own acceptance time; clients must not send it.
       security:
-        - bearerAuth: []
+        - apiBearerAuth: []
       requestBody:
         required: true
         content:
           application/json:
             schema:
               $ref: "#/components/schemas/FinalizeResultRequest"
+            example:
+              event_id: result-01K4E0W1K6ZQ1M47A9P9YQPKSK
+              room_id: room-01K4DZVFKVR7X8R7HPG25BX21D
+              mode_id: klondike-ranked
+              deck_id: deck-2026-09-05-000042
+              scoring_rules_version: klondike-v1
+              finished_at: "2026-09-05T06:00:00Z"
+              available_at: "2026-09-05T06:00:01Z"
+              participants:
+                - session_id: session-01
+                  player_id: player-01
+                  place: 1
+                  features: {score: 745, elapsed_ms: 181000, completed: true, moves: 112}
+                - session_id: session-02
+                  player_id: player-02
+                  place: 2
+                  features: {score: 710, elapsed_ms: 196000, completed: true, moves: 118}
+                - session_id: session-03
+                  player_id: player-03
+                  place: 3
+                  features: {score: 660, elapsed_ms: 214000, completed: true}
+                - session_id: session-04
+                  player_id: player-04
+                  place: 4
+                  features: {score: 410, elapsed_ms: 260000, completed: true}
+                - session_id: session-05
+                  player_id: player-05
+                  place: 5
+                  features: {completed: false}
       responses:
         "201":
           description: Result accepted and the room completed atomically.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestID"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/FinalizedResult"
         "200":
           description: Identical idempotent retry of a stored result.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestID"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/FinalizedResult"
         "400":
-          description: Malformed or invalid complete result.
+          description: Malformed JSON, unknown fields or an invalid complete result.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestID"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example: {error: invalid_result}
         "401":
-          description: Authentication failed.
+          $ref: "#/components/responses/Unauthorized"
         "404":
           description: Referenced room does not exist.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestID"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example: {error: room_not_found}
         "409":
-          description: Identity, participant, room-state or deadline conflict.
+          description: Event identity, participant set, room state or deadline conflicts with the request.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestID"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              examples:
+                identity:
+                  value: {error: result_conflict}
+                state:
+                  value: {error: room_not_collecting}
+                deadline:
+                  value: {error: result_deadline_passed}
+                participants:
+                  value: {error: participants_mismatch}
+        "500":
+          description: Result finalization failed unexpectedly.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestID"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example: {error: internal_error}
+webhooks:
+  outboxEvent:
+    post:
+      tags: [Integration]
+      summary: Receive a committed matchmaking event
+      operationId: receiveOutboxEvent
+      description: |
+        The matchmaking service sends this request to the runtime-configured
+        `OUTBOX_DELIVERY_URL`. Delivery is at least once and redirects are not
+        followed. The receiver must atomically persist the event identity and
+        its side effect before returning a 2xx response.
+      security:
+        - outboxBearerAuth: []
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          description: Must equal the request body's `event_id`.
+          schema:
+            type: string
+            minLength: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OutboxEvent"
+            example:
+              event_id: 01K4E11XX3B9GYM4YRQ6TAKCZA
+              aggregate_type: ticket
+              aggregate_id: ticket-01
+              aggregate_version: 2
+              event_type: ticket.assigned
+              payload:
+                ticket_id: ticket-01
+                room_id: room-01K4DZVFKVR7X8R7HPG25BX21D
+                session_id: session-01
+                player_id: player-01
+                seat: 1
+                assigned_at: "2026-09-05T06:00:01Z"
+              occurred_at: "2026-09-05T06:00:01Z"
+      responses:
+        "2XX":
+          description: Event identity and side effect were durably accepted, or an identical event was already applied.
+        default:
+          description: Event was not accepted; the matchmaking service schedules a bounded retry.
 components:
   securitySchemes:
-    bearerAuth:
+    apiBearerAuth:
       type: http
       scheme: bearer
+      description: API token configured as `API_TOKEN`.
+    outboxBearerAuth:
+      type: http
+      scheme: bearer
+      description: Delivery token configured as `OUTBOX_DELIVERY_TOKEN`.
+  headers:
+    RequestID:
+      description: Opaque request correlation identity generated by the service.
+      schema:
+        type: string
+        minLength: 1
+  responses:
+    Unauthorized:
+      description: Bearer authentication failed.
+      headers:
+        WWW-Authenticate:
+          schema:
+            type: string
+            const: Bearer
+        X-Request-ID:
+          $ref: "#/components/headers/RequestID"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example: {error: unauthorized}
   schemas:
     Status:
       type: object
+      additionalProperties: false
       required: [status]
       properties:
         status:
           type: string
+          enum: [ok, ready, not_ready]
     Capabilities:
       type: object
+      additionalProperties: false
       required: [service, stage, rating_enabled, matchmaking_enabled, result_ingestion_enabled, outbox_delivery_enabled, planned_room_sizes]
       properties:
         service:
+          type: string
           const: solitaire-matchmaking
         stage:
+          type: string
           const: transactional_event_delivery
         rating_enabled:
+          type: boolean
           const: true
         matchmaking_enabled:
+          type: boolean
           const: true
         result_ingestion_enabled:
+          type: boolean
           const: true
         outbox_delivery_enabled:
+          type: boolean
           const: true
         planned_room_sizes:
           type: array
+          minItems: 3
+          maxItems: 3
           items:
             type: integer
             enum: [5, 6, 7]
+    Error:
+      type: object
+      additionalProperties: false
+      required: [error]
+      properties:
+        error:
+          type: string
+          enum: [unauthorized, invalid_result, room_not_found, result_conflict, room_not_collecting, result_deadline_passed, participants_mismatch, internal_error]
     FinalizeResultRequest:
       type: object
       additionalProperties: false
@@ -120,6 +333,7 @@ components:
         event_id:
           type: string
           minLength: 1
+          description: Stable result identity used for idempotency.
         room_id:
           type: string
           minLength: 1
@@ -138,10 +352,12 @@ components:
         available_at:
           type: string
           format: date-time
+          description: Must not precede `finished_at` or be later than service acceptance time.
         participants:
           type: array
           minItems: 5
           maxItems: 7
+          description: Must exactly match the room sessions and contain at least one first-place participant.
           items:
             $ref: "#/components/schemas/VerifiedParticipant"
     VerifiedParticipant:
@@ -159,11 +375,13 @@ components:
           type: integer
           minimum: 1
           maximum: 7
+          description: One-based placement; ties are interpreted by `scoring_rules_version`.
         features:
           $ref: "#/components/schemas/ResultFeatures"
     ResultFeatures:
       type: object
       additionalProperties: false
+      description: Optional authoritative observations; absent values remain missing rather than zero.
       properties:
         score:
           type: integer
@@ -174,6 +392,7 @@ components:
           minimum: 0
         completed:
           type: boolean
+          description: False marks the session as forfeited; absent or true marks it submitted.
         moves:
           type: integer
           format: int64
@@ -188,6 +407,7 @@ components:
           minimum: 0
     FinalizedResult:
       type: object
+      additionalProperties: false
       required: [result, room_version, completed_at, rating_pending, replay]
       properties:
         result:
@@ -199,41 +419,65 @@ components:
         completed_at:
           type: string
           format: date-time
+          description: Service acceptance time recorded on the initial request.
         rating_pending:
           type: boolean
         replay:
           type: boolean
     MatchResult:
       type: object
+      additionalProperties: false
       required: [event_id, room_id, mode_id, deck_id, scoring_rules_version, finished_at, available_at, participants]
       properties:
-        event_id:
-          type: string
-        room_id:
-          type: string
-        mode_id:
-          type: string
-        deck_id:
-          type: string
-        scoring_rules_version:
-          type: string
-        finished_at:
-          type: string
-          format: date-time
-        available_at:
-          type: string
-          format: date-time
+        event_id: {type: string}
+        room_id: {type: string}
+        mode_id: {type: string}
+        deck_id: {type: string}
+        scoring_rules_version: {type: string}
+        finished_at: {type: string, format: date-time}
+        available_at: {type: string, format: date-time}
         participants:
           type: array
+          minItems: 5
+          maxItems: 7
           items:
             $ref: "#/components/schemas/Standing"
     Standing:
       type: object
+      additionalProperties: false
       required: [player_id, place, features]
       properties:
-        player_id:
-          type: string
-        place:
-          type: integer
+        player_id: {type: string}
+        place: {type: integer, minimum: 1, maximum: 7}
         features:
           $ref: "#/components/schemas/ResultFeatures"
+    OutboxEvent:
+      type: object
+      additionalProperties: false
+      required: [event_id, aggregate_type, aggregate_id, aggregate_version, event_type, payload, occurred_at]
+      properties:
+        event_id:
+          type: string
+          minLength: 1
+          description: Global event identity and deduplication key.
+        aggregate_type:
+          type: string
+          enum: [ticket, room, result]
+        aggregate_id:
+          type: string
+          minLength: 1
+        aggregate_version:
+          type: integer
+          format: int64
+          minimum: 1
+          description: Ordering sequence within one aggregate.
+        event_type:
+          type: string
+          enum: [ticket.accepted, ticket.cancelled, ticket.assigned, ticket.expired, room.filled, room.completed, room.expired, result.rated]
+        payload:
+          type: object
+          description: Event-specific object documented in `docs/api-contract.md`.
+          additionalProperties: true
+        occurred_at:
+          type: string
+          format: date-time

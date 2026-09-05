@@ -1,59 +1,102 @@
-# Planned game-backend contract
+# Game-backend integration contract
 
-This document defines the remaining integration direction. Implemented endpoints,
-including verified-result ingestion, are defined in `api/openapi.yaml`.
+The implemented inbound API and outbound webhook envelope are defined in
+[OpenAPI](../api/openapi.yaml). A runnable Go receiver is available in
+[examples/game-backend](../examples/game-backend/README.md).
 
-## Commands
+## Implemented inbound API
 
-| Endpoint | Purpose | Idempotency identity |
+| Endpoint | Authentication | Purpose |
 | --- | --- | --- |
-| `POST /v1/tickets` | Accept an eligible, reserved tournament entry and rating snapshot | entry id |
-| `DELETE /v1/tickets/{ticket_id}` | Cancel a queued entry subject to tournament rules | ticket id + command id |
-| `POST /v1/results` | Accept a server-verified complete room result (implemented) | result event id |
+| GET /healthz | None | Process liveness |
+| GET /readyz | None | PostgreSQL readiness and draining state |
+| GET /v1/capabilities | API_TOKEN bearer | Current service capabilities |
+| POST /v1/results | API_TOKEN bearer | Complete, server-verified room result |
 
-## Queries
+Results use the body field `event_id` as their idempotency identity, not an
+Idempotency-Key header. Persist the request before sending it and reuse that
+identity and logical data after a timeout or 5xx response. The initial acceptance
+returns 201; an identical replay returns 200 with `replay: true`. Participant
+order and equivalent timestamp offsets do not change retry equality.
+The replay's `rating_pending` reflects current processing state and may change.
 
-| Endpoint | Purpose |
-| --- | --- |
-| `GET /v1/tickets/{ticket_id}` | Read queue or assignment state |
-| `GET /v1/rooms/{room_id}` | Read composition and lifecycle state |
-| `GET /v1/ratings/{player_id}?mode_id=...` | Read current versioned rating estimate |
+A result must reference the allocated room, mode, deck, scoring-rules version
+and every player/session pair. Send five to seven unique participants, with
+places within the room size and at least one first place. Ties are allowed.
+The finish time must not precede session allocation; availability must follow
+or equal finish time and must not be in the future at service acceptance.
+Initial acceptance must meet the room deadline. An already committed identical
+result remains replayable after the deadline.
 
-Every command carries a stable external identity and returns the stored result on
-an identical retry. A reused identity with a different body is a conflict. Result
-requests must reference a known session, room, deck and scoring-rules version.
+Missing features remain missing; zero and false are observations. In this
+service, `completed: false` forfeits the session, while absent or true marks it
+submitted. Only authoritative game-backend observations may feed rating.
 
-The authoritative game backend sends verified results. Client telemetry may be
-retained separately for investigation but never becomes an authoritative rating
-input merely because the client submitted it.
+| HTTP status | Error code | Caller action |
+| --- | --- | --- |
+| 400 | invalid_result | Correct malformed, oversized, unknown-field or invalid data |
+| 401 | unauthorized | Correct bearer credentials |
+| 404 | room_not_found | Reconcile room identity |
+| 409 | result_conflict | Reconcile reused identity or mismatched mode/deck/rules |
+| 409 | room_not_collecting | Reconcile terminal or incomplete room state |
+| 409 | result_deadline_passed | Reconcile late initial result |
+| 409 | participants_mismatch | Reconcile allocated sessions and participants |
+| 500 | internal_error | Retry the persisted request with bounded backoff |
 
-Outgoing assignment, room completion and settlement-request events use a
-transactional outbox. Delivery is at least once, so consumers must deduplicate by
-event id. The implemented baseline permits tied places, maps `completed: false`
-to a forfeited session, rejects incomplete rooms, and rejects results accepted
-after the room deadline. Settlement responses remain outside this service.
+Log the response X-Request-ID for diagnosis. Do not generate a new result identity
+to work around a conflict. Unknown routes and unsupported methods use standard
+HTTP mux responses, which are not the JSON application-error schema.
 
 ## Outgoing event delivery
 
-The service sends every committed outbox record as `POST
-$OUTBOX_DELIVERY_URL`. Requests use `Authorization: Bearer
-<OUTBOX_DELIVERY_TOKEN>`, `Content-Type: application/json` and
-`Idempotency-Key: <event_id>`. The endpoint must return any `2xx` status only
-after it has durably accepted the event identity. Redirects are not followed.
+The service sends POST requests to OUTBOX_DELIVERY_URL with a distinct
+OUTBOX_DELIVERY_TOKEN bearer credential, Content-Type application/json,
+Idempotency-Key equal to event_id and User-Agent solitaire-matchmaking-outbox/1.
+HTTPS is required except on loopback development endpoints. Redirects are not
+followed. Network errors and all non-2xx responses are retried with capped
+exponential delay; the attempt count is not capped.
 
-```json
-{
-  "event_id": "event-identity",
-  "aggregate_type": "ticket",
-  "aggregate_id": "ticket-identity",
-  "aggregate_version": 2,
-  "event_type": "ticket.assigned",
-  "payload": {},
-  "occurred_at": "2026-09-05T06:00:00Z"
-}
-```
+The envelope contains event_id, aggregate_type, aggregate_id,
+aggregate_version, event_type, payload and occurred_at. Persist event identity
+and the business side effect atomically before acknowledging with 2xx. An
+identical replay must succeed without reapplying the effect; conflicting data
+for an existing identity must be investigated.
 
-Consumers must treat an identical `event_id` as a replay, persist the
-deduplication decision atomically with their side effect and tolerate retries
-after timeouts or lost acknowledgements. Events are ordered within an aggregate,
-not globally across tickets, rooms and results.
+| Event | Aggregate | Payload fields |
+| --- | --- | --- |
+| ticket.accepted | ticket | ticket_id, entry_id, player_id, tournament_id, tournament_version, status, requested_at |
+| ticket.cancelled | ticket | ticket_id, status, cancelled_at |
+| ticket.assigned | ticket | ticket_id, room_id, session_id, player_id, seat, assigned_at |
+| ticket.expired | ticket | ticket_id, status, deadline, expired_at |
+| room.filled | room | room_id, filled_at, result_deadline |
+| room.completed | room | result_event_id, room_id, completed_at, rating_pending, standings |
+| room.expired | room | RoomID, RoomVersion, ResultDeadline, ExpiredAt |
+| result.rated | result | result_event_id, mode_id, model_version, processed_at, updates |
+
+The existing room.expired payload uses capitalized keys; consumers must preserve
+this wire compatibility. Standings contain player_id, place and features.
+Rating updates contain player_id, source_event_id, model_version, before, after
+and processed_at. Each estimate contains mean, uncertainty, optional
+performance_deviation, games, model_version and updated_at.
+
+Delivery is ordered within an aggregate, not globally across tickets, rooms and
+results. Aggregate versions may have gaps. Lost acknowledgements or expired
+leases can cause duplicate requests, including stale retries; receivers must
+deduplicate and prevent stale events from overwriting newer state. Cross-aggregate
+dependencies require reconciliation by identity. Settlement remains owned by
+the game backend.
+
+## Planned HTTP surface
+
+Ticket use cases exist internally, but these HTTP routes are not registered:
+
+| Endpoint | Intended purpose |
+| --- | --- |
+| POST /v1/tickets | Accept an eligible reserved entry and rating snapshot |
+| DELETE /v1/tickets/{ticket_id} | Cancel an eligible queued entry |
+| GET /v1/tickets/{ticket_id} | Read queue or assignment state |
+| GET /v1/rooms/{room_id} | Read composition and lifecycle state |
+| GET /v1/ratings/{player_id}?mode_id=... | Read a versioned rating |
+
+The receiver example and result endpoint alone do not constitute a complete
+external onboarding path. Ticket/query HTTP adapters remain integration work.
