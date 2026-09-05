@@ -16,10 +16,16 @@ import (
 	"strings"
 	"sync/atomic"
 	"time"
+
+	"github.com/krav01/solitaire-matchmaking/internal/tournament"
 )
 
 // Readiness is implemented by the PostgreSQL pool and extended at later stages.
 type Readiness interface{ Ping(context.Context) error }
+
+type ResultFinalizer interface {
+	Finalize(context.Context, tournament.FinalizeResultCommand) (tournament.FinalizedResult, error)
+}
 
 type Options struct {
 	APIToken         string
@@ -34,9 +40,9 @@ type Server struct {
 	draining atomic.Bool
 }
 
-func New(check Readiness, logger *slog.Logger, opts Options) (*Server, error) {
-	if check == nil || logger == nil {
-		return nil, errors.New("readiness checker and logger are required")
+func New(check Readiness, results ResultFinalizer, logger *slog.Logger, opts Options) (*Server, error) {
+	if check == nil || results == nil || logger == nil {
+		return nil, errors.New("readiness checker, result finalizer and logger are required")
 	}
 	if len(opts.APIToken) < 32 || opts.ReadinessTimeout <= 0 || opts.ReadinessTimeout > 5*time.Second || opts.ShutdownTimeout <= 0 {
 		return nil, errors.New("invalid HTTP server options")
@@ -61,19 +67,16 @@ func New(check Readiness, logger *slog.Logger, opts Options) (*Server, error) {
 		s.respond(w, r, http.StatusOK, map[string]string{"status": "ready"})
 	})
 	mux.HandleFunc("GET /v1/capabilities", func(w http.ResponseWriter, r *http.Request) {
-		header := r.Header.Get("Authorization")
-		providedToken := sha256.Sum256([]byte(strings.TrimPrefix(header, "Bearer ")))
-		if !strings.HasPrefix(header, "Bearer ") || subtle.ConstantTimeCompare(providedToken[:], expectedToken[:]) != 1 {
-			w.Header().Set("WWW-Authenticate", "Bearer")
-			s.respond(w, r, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+		if !s.authorize(w, r, expectedToken) {
 			return
 		}
 		s.respond(w, r, http.StatusOK, map[string]any{
-			"service": "solitaire-matchmaking", "stage": "foundation",
-			"rating_enabled": false, "matchmaking_enabled": false,
+			"service": "solitaire-matchmaking", "stage": "result_finalization",
+			"rating_enabled": false, "matchmaking_enabled": true, "result_ingestion_enabled": true,
 			"planned_room_sizes": []int{5, 6, 7},
 		})
 	})
+	s.registerResultRoutes(mux, results, expectedToken)
 	s.http = &http.Server{
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("X-Request-ID", rand.Text())
@@ -87,6 +90,17 @@ func New(check Readiness, logger *slog.Logger, opts Options) (*Server, error) {
 		ErrorLog:       slog.NewLogLogger(logger.Handler(), slog.LevelError),
 	}
 	return s, nil
+}
+
+func (s *Server) authorize(w http.ResponseWriter, r *http.Request, expectedToken [sha256.Size]byte) bool {
+	header := r.Header.Get("Authorization")
+	providedToken := sha256.Sum256([]byte(strings.TrimPrefix(header, "Bearer ")))
+	if strings.HasPrefix(header, "Bearer ") && subtle.ConstantTimeCompare(providedToken[:], expectedToken[:]) == 1 {
+		return true
+	}
+	w.Header().Set("WWW-Authenticate", "Bearer")
+	s.respond(w, r, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+	return false
 }
 
 func (s *Server) Handler() http.Handler { return s.http.Handler }

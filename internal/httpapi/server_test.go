@@ -8,10 +8,12 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/krav01/solitaire-matchmaking/internal/httpapi"
+	"github.com/krav01/solitaire-matchmaking/internal/tournament"
 )
 
 const testToken = "0123456789abcdef0123456789abcdef"
@@ -83,9 +85,65 @@ func TestServerCapabilitiesRequireAuthentication(t *testing.T) {
 	}
 }
 
+func TestServerFinalizesAuthenticatedResult(t *testing.T) {
+	t.Parallel()
+	finalizer := &resultFinalizerStub{}
+	server := newServerWithResults(t, readinessStub{}, finalizer)
+	finishedAt := time.Now().UTC().Add(-2 * time.Second)
+	body := `{
+		"event_id":"result-a","room_id":"room-a","mode_id":"mode-a",
+		"deck_id":"deck-a","scoring_rules_version":"rules-v1",
+		"finished_at":"` + finishedAt.Format(time.RFC3339Nano) + `",
+		"available_at":"` + finishedAt.Add(time.Second).Format(time.RFC3339Nano) + `",
+		"participants":[
+			{"session_id":"session-a","player_id":"player-a","place":1,"features":{}},
+			{"session_id":"session-b","player_id":"player-b","place":2,"features":{}},
+			{"session_id":"session-c","player_id":"player-c","place":3,"features":{}},
+			{"session_id":"session-d","player_id":"player-d","place":4,"features":{}},
+			{"session_id":"session-e","player_id":"player-e","place":5,"features":{}}
+		]
+	}`
+	request := httptest.NewRequest(http.MethodPost, "/v1/results", strings.NewReader(body))
+	request.Header.Set("Authorization", "Bearer "+testToken)
+	response := httptest.NewRecorder()
+	server.Handler().ServeHTTP(response, request)
+	if response.Code != http.StatusCreated {
+		t.Fatalf("status = %d, body = %s", response.Code, response.Body.String())
+	}
+	if finalizer.command.EventID != "result-a" || finalizer.command.AcceptedAt.IsZero() {
+		t.Fatalf("finalizer command = %+v", finalizer.command)
+	}
+}
+
+func TestServerRejectsUnauthenticatedResult(t *testing.T) {
+	t.Parallel()
+	server := newServer(t, readinessStub{})
+	response := httptest.NewRecorder()
+	server.Handler().ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/v1/results", strings.NewReader("{}")))
+	if response.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want %d", response.Code, http.StatusUnauthorized)
+	}
+}
+
+type resultFinalizerStub struct {
+	command tournament.FinalizeResultCommand
+	result  tournament.FinalizedResult
+	err     error
+}
+
+func (finalizer *resultFinalizerStub) Finalize(_ context.Context, command tournament.FinalizeResultCommand) (tournament.FinalizedResult, error) {
+	finalizer.command = command
+	return finalizer.result, finalizer.err
+}
+
 func newServer(t *testing.T, check httpapi.Readiness) *httpapi.Server {
 	t.Helper()
-	server, err := httpapi.New(check, slog.New(slog.NewTextHandler(io.Discard, nil)), httpapi.Options{
+	return newServerWithResults(t, check, &resultFinalizerStub{})
+}
+
+func newServerWithResults(t *testing.T, check httpapi.Readiness, results httpapi.ResultFinalizer) *httpapi.Server {
+	t.Helper()
+	server, err := httpapi.New(check, results, slog.New(slog.NewTextHandler(io.Discard, nil)), httpapi.Options{
 		APIToken: testToken, ReadinessTimeout: time.Second, ShutdownTimeout: time.Second,
 	})
 	if err != nil {

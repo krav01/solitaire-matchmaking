@@ -1,8 +1,8 @@
 openapi: 3.1.0
 info:
   title: Solitaire Matchmaking API
-  version: 0.1.0
-  description: Implemented foundation endpoints. Business endpoints remain planned.
+  version: 0.2.0
+  description: Implemented service health, capability and verified-result endpoints.
 servers:
   - url: http://127.0.0.1:8080
 paths:
@@ -46,6 +46,39 @@ paths:
                 $ref: "#/components/schemas/Capabilities"
         "401":
           description: Authentication failed.
+  /v1/results:
+    post:
+      operationId: finalizeVerifiedResult
+      description: Finalize one complete, game-backend-verified room result before its deadline.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FinalizeResultRequest"
+      responses:
+        "201":
+          description: Result accepted and the room completed atomically.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FinalizedResult"
+        "200":
+          description: Identical idempotent retry of a stored result.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FinalizedResult"
+        "400":
+          description: Malformed or invalid complete result.
+        "401":
+          description: Authentication failed.
+        "404":
+          description: Referenced room does not exist.
+        "409":
+          description: Identity, participant, room-state or deadline conflict.
 components:
   securitySchemes:
     bearerAuth:
@@ -60,18 +93,145 @@ components:
           type: string
     Capabilities:
       type: object
-      required: [service, stage, rating_enabled, matchmaking_enabled, planned_room_sizes]
+      required: [service, stage, rating_enabled, matchmaking_enabled, result_ingestion_enabled, planned_room_sizes]
       properties:
         service:
           const: solitaire-matchmaking
         stage:
-          const: foundation
+          const: result_finalization
         rating_enabled:
           const: false
         matchmaking_enabled:
-          const: false
+          const: true
+        result_ingestion_enabled:
+          const: true
         planned_room_sizes:
           type: array
           items:
             type: integer
             enum: [5, 6, 7]
+    FinalizeResultRequest:
+      type: object
+      additionalProperties: false
+      required: [event_id, room_id, mode_id, deck_id, scoring_rules_version, finished_at, available_at, participants]
+      properties:
+        event_id:
+          type: string
+          minLength: 1
+        room_id:
+          type: string
+          minLength: 1
+        mode_id:
+          type: string
+          minLength: 1
+        deck_id:
+          type: string
+          minLength: 1
+        scoring_rules_version:
+          type: string
+          minLength: 1
+        finished_at:
+          type: string
+          format: date-time
+        available_at:
+          type: string
+          format: date-time
+        participants:
+          type: array
+          minItems: 5
+          maxItems: 7
+          items:
+            $ref: "#/components/schemas/VerifiedParticipant"
+    VerifiedParticipant:
+      type: object
+      additionalProperties: false
+      required: [session_id, player_id, place]
+      properties:
+        session_id:
+          type: string
+          minLength: 1
+        player_id:
+          type: string
+          minLength: 1
+        place:
+          type: integer
+          minimum: 1
+          maximum: 7
+        features:
+          $ref: "#/components/schemas/ResultFeatures"
+    ResultFeatures:
+      type: object
+      additionalProperties: false
+      properties:
+        score:
+          type: integer
+          format: int64
+        elapsed_ms:
+          type: integer
+          format: int64
+          minimum: 0
+        completed:
+          type: boolean
+        moves:
+          type: integer
+          format: int64
+          minimum: 0
+        undo_moves:
+          type: integer
+          format: int64
+          minimum: 0
+        revealed_cards:
+          type: integer
+          format: int64
+          minimum: 0
+    FinalizedResult:
+      type: object
+      required: [result, room_version, completed_at, rating_pending, replay]
+      properties:
+        result:
+          $ref: "#/components/schemas/MatchResult"
+        room_version:
+          type: integer
+          format: int64
+          minimum: 1
+        completed_at:
+          type: string
+          format: date-time
+        rating_pending:
+          type: boolean
+        replay:
+          type: boolean
+    MatchResult:
+      type: object
+      required: [event_id, room_id, mode_id, deck_id, scoring_rules_version, finished_at, available_at, participants]
+      properties:
+        event_id:
+          type: string
+        room_id:
+          type: string
+        mode_id:
+          type: string
+        deck_id:
+          type: string
+        scoring_rules_version:
+          type: string
+        finished_at:
+          type: string
+          format: date-time
+        available_at:
+          type: string
+          format: date-time
+        participants:
+          type: array
+          items:
+            $ref: "#/components/schemas/Standing"
+    Standing:
+      type: object
+      required: [player_id, place, features]
+      properties:
+        player_id:
+          type: string
+        place:
+          type: integer
+        features:
+          $ref: "#/components/schemas/ResultFeatures"

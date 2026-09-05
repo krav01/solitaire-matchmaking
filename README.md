@@ -14,8 +14,10 @@ foundation provides configuration, PostgreSQL connectivity, liveness, readiness
 and an authenticated capability endpoint. Transactional persistence now covers
 versioned migrations plus idempotent ticket acceptance, cancellation and atomic
 room assignment. A bounded, lease-fenced worker now performs fair room selection,
-fast stale-room retries and transactional ticket expiry; result processing and
-outbox delivery remain in progress.
+fast stale-room retries and transactional ticket expiry. The authenticated result
+endpoint validates complete authoritative standings and atomically completes a
+room; a bounded deadline worker expires rooms that never receive a timely result.
+Time-ordered rating processing and outbox delivery remain in progress.
 
 ## Architecture
 
@@ -67,12 +69,19 @@ corresponding `MATCH_WORKER_*` variables in `.env.example` are independently
 configurable. Batch size bounds database work; concurrency controls fill speed.
 Neither setting changes the policy's hard fairness limits.
 
+Result-deadline scans default to 32 rooms once per second. The
+`RESULT_DEADLINE_*` variables bound this work independently of matchmaking.
+
 ```bash
 curl http://127.0.0.1:8080/healthz
 curl http://127.0.0.1:8080/readyz
 curl -H "Authorization: Bearer $API_TOKEN" \
   http://127.0.0.1:8080/v1/capabilities
 ```
+
+The verified-result request and response schemas are documented in
+[`api/openapi.yaml`](api/openapi.yaml). Identical retries return the stored result;
+late, partial or identity-conflicting results are rejected.
 
 ## Verification
 

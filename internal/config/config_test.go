@@ -20,7 +20,7 @@ func TestLoad(t *testing.T) {
 	}{
 		{name: "valid defaults"},
 		{name: "valid overrides", values: map[string]string{"HTTP_ADDR": "0.0.0.0:9090", "DB_MAX_CONNS": "20", "LOG_LEVEL": "debug"}},
-		{name: "valid worker overrides", values: map[string]string{"MATCH_WORKER_BATCH_SIZE": "16", "MATCH_WORKER_CONCURRENCY": "4", "MATCH_WORKER_LEASE": "5s"}},
+		{name: "valid worker overrides", values: map[string]string{"MATCH_WORKER_BATCH_SIZE": "16", "MATCH_WORKER_CONCURRENCY": "4", "MATCH_WORKER_LEASE": "5s", "RESULT_DEADLINE_BATCH_SIZE": "8", "RESULT_DEADLINE_POLL_INTERVAL": "2s"}},
 		{name: "missing database URL", values: map[string]string{"DATABASE_URL": ""}, wantErr: true},
 		{name: "short API token", values: map[string]string{"API_TOKEN": "short"}, wantErr: true},
 		{name: "invalid listen port", values: map[string]string{"HTTP_ADDR": "127.0.0.1:70000"}, wantErr: true},
