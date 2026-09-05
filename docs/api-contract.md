@@ -32,3 +32,28 @@ transactional outbox. Delivery is at least once, so consumers must deduplicate b
 event id. The implemented baseline permits tied places, maps `completed: false`
 to a forfeited session, rejects incomplete rooms, and rejects results accepted
 after the room deadline. Settlement responses remain outside this service.
+
+## Outgoing event delivery
+
+The service sends every committed outbox record as `POST
+$OUTBOX_DELIVERY_URL`. Requests use `Authorization: Bearer
+<OUTBOX_DELIVERY_TOKEN>`, `Content-Type: application/json` and
+`Idempotency-Key: <event_id>`. The endpoint must return any `2xx` status only
+after it has durably accepted the event identity. Redirects are not followed.
+
+```json
+{
+  "event_id": "event-identity",
+  "aggregate_type": "ticket",
+  "aggregate_id": "ticket-identity",
+  "aggregate_version": 2,
+  "event_type": "ticket.assigned",
+  "payload": {},
+  "occurred_at": "2026-09-05T06:00:00Z"
+}
+```
+
+Consumers must treat an identical `event_id` as a replay, persist the
+deduplication decision atomically with their side effect and tolerate retries
+after timeouts or lost acknowledgements. Events are ordered within an aggregate,
+not globally across tickets, rooms and results.

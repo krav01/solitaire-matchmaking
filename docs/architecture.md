@@ -72,3 +72,20 @@ deck generation, result verification, reservations and settlement. This service
 does not accept authoritative scores directly from game clients. Health is public;
 business endpoints require service authentication. Detailed infrastructure errors
 are logged internally and are not returned in API responses.
+
+## ADR-007: At-least-once transactional event delivery
+
+**Status:** accepted.
+
+Committed outbox events are delivered to one configured game-backend HTTPS
+endpoint. Independent aggregates may be published concurrently, while an
+undelivered lower aggregate version blocks later versions of the same aggregate.
+Delivery uses short database leases, unique claim tokens and database-time
+fencing; network calls never hold row locks.
+
+Successful `2xx` responses acknowledge an event. Other statuses and transport
+failures schedule a bounded exponential retry. Because a request can succeed
+before its acknowledgement is committed, the contract is at least once and the
+receiver must deduplicate `Idempotency-Key: <event_id>`. Redirects are disabled,
+remote clear-text HTTP is rejected, and delivery uses a credential distinct from
+the inbound API token.

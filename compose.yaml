@@ -21,6 +21,8 @@ services:
       HTTP_ADDR: 0.0.0.0:8080
       DATABASE_URL: postgres://matchmaking:matchmaking@postgres:5432/matchmaking?sslmode=disable
       API_TOKEN: ${API_TOKEN:?API_TOKEN is required}
+      OUTBOX_DELIVERY_URL: ${OUTBOX_DELIVERY_URL:?OUTBOX_DELIVERY_URL is required}
+      OUTBOX_DELIVERY_TOKEN: ${OUTBOX_DELIVERY_TOKEN:?OUTBOX_DELIVERY_TOKEN is required}
     depends_on:
       postgres:
         condition: service_healthy

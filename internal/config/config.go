@@ -31,6 +31,15 @@ type Config struct {
 	RatingLease          time.Duration
 	RatingPollInterval   time.Duration
 	RatingFailureBackoff time.Duration
+	OutboxDeliveryURL    string
+	OutboxDeliveryToken  string
+	OutboxBatchSize      int
+	OutboxConcurrency    int
+	OutboxLease          time.Duration
+	OutboxPollInterval   time.Duration
+	OutboxRequestTimeout time.Duration
+	OutboxRetryBaseDelay time.Duration
+	OutboxRetryMaxDelay  time.Duration
 }
 
 // Load accepts an environment accessor to keep tests isolated from os.Environ.
@@ -46,6 +55,11 @@ func Load(getenv func(string) string) (Config, error) {
 		ResultDeadlineBatch:  32, ResultDeadlinePoll: time.Second,
 		RatingLease: 10 * time.Second, RatingPollInterval: 100 * time.Millisecond,
 		RatingFailureBackoff: time.Second,
+		OutboxDeliveryURL:    getenv("OUTBOX_DELIVERY_URL"),
+		OutboxDeliveryToken:  getenv("OUTBOX_DELIVERY_TOKEN"),
+		OutboxBatchSize:      32, OutboxConcurrency: 8, OutboxLease: 30 * time.Second,
+		OutboxPollInterval: 100 * time.Millisecond, OutboxRequestTimeout: 5 * time.Second,
+		OutboxRetryBaseDelay: time.Second, OutboxRetryMaxDelay: time.Minute,
 	}
 	if value := getenv("HTTP_ADDR"); value != "" {
 		c.HTTPAddr = value
@@ -65,6 +79,8 @@ func Load(getenv func(string) string) (Config, error) {
 		{"MATCH_WORKER_BATCH_SIZE", &c.MatchBatchSize, 256},
 		{"MATCH_WORKER_CONCURRENCY", &c.MatchConcurrency, 256},
 		{"RESULT_DEADLINE_BATCH_SIZE", &c.ResultDeadlineBatch, 256},
+		{"OUTBOX_WORKER_BATCH_SIZE", &c.OutboxBatchSize, 256},
+		{"OUTBOX_WORKER_CONCURRENCY", &c.OutboxConcurrency, 256},
 	} {
 		if value := getenv(entry.key); value != "" {
 			n, err := strconv.Atoi(value)
@@ -89,6 +105,11 @@ func Load(getenv func(string) string) (Config, error) {
 		{"RATING_WORKER_LEASE", &c.RatingLease},
 		{"RATING_WORKER_POLL_INTERVAL", &c.RatingPollInterval},
 		{"RATING_WORKER_FAILURE_BACKOFF", &c.RatingFailureBackoff},
+		{"OUTBOX_WORKER_LEASE", &c.OutboxLease},
+		{"OUTBOX_WORKER_POLL_INTERVAL", &c.OutboxPollInterval},
+		{"OUTBOX_REQUEST_TIMEOUT", &c.OutboxRequestTimeout},
+		{"OUTBOX_RETRY_BASE_DELAY", &c.OutboxRetryBaseDelay},
+		{"OUTBOX_RETRY_MAX_DELAY", &c.OutboxRetryMaxDelay},
 	} {
 		if value := getenv(entry.key); value != "" {
 			d, err := time.ParseDuration(value)
@@ -107,6 +128,15 @@ func Load(getenv func(string) string) (Config, error) {
 	if c.MatchStaleRetryDelay > time.Second {
 		return Config{}, errors.New("MATCH_WORKER_STALE_RETRY_DELAY cannot exceed one second")
 	}
+	if c.OutboxConcurrency > c.OutboxBatchSize {
+		return Config{}, errors.New("OUTBOX_WORKER_CONCURRENCY cannot exceed OUTBOX_WORKER_BATCH_SIZE")
+	}
+	if c.OutboxRequestTimeout >= c.OutboxLease {
+		return Config{}, errors.New("OUTBOX_REQUEST_TIMEOUT must be shorter than OUTBOX_WORKER_LEASE")
+	}
+	if c.OutboxRetryBaseDelay > c.OutboxRetryMaxDelay {
+		return Config{}, errors.New("OUTBOX_RETRY_BASE_DELAY cannot exceed OUTBOX_RETRY_MAX_DELAY")
+	}
 	if value := getenv("LOG_LEVEL"); value != "" {
 		if err := c.LogLevel.UnmarshalText([]byte(value)); err != nil {
 			return Config{}, errors.New("invalid LOG_LEVEL")
@@ -117,6 +147,12 @@ func Load(getenv func(string) string) (Config, error) {
 	}
 	if len(c.APIToken) < 32 || strings.ContainsAny(c.APIToken, " \r\n\t") {
 		return Config{}, errors.New("API_TOKEN must contain at least 32 characters without whitespace")
+	}
+	if strings.TrimSpace(c.OutboxDeliveryURL) == "" {
+		return Config{}, errors.New("OUTBOX_DELIVERY_URL is required")
+	}
+	if len(c.OutboxDeliveryToken) < 32 || strings.ContainsAny(c.OutboxDeliveryToken, " \r\n\t") {
+		return Config{}, errors.New("OUTBOX_DELIVERY_TOKEN must contain at least 32 characters without whitespace")
 	}
 	_, port, err := net.SplitHostPort(c.HTTPAddr)
 	if err != nil {

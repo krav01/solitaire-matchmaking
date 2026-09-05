@@ -71,9 +71,10 @@ func New(check Readiness, results ResultFinalizer, logger *slog.Logger, opts Opt
 			return
 		}
 		s.respond(w, r, http.StatusOK, map[string]any{
-			"service": "solitaire-matchmaking", "stage": "baseline_rating_persistence",
+			"service": "solitaire-matchmaking", "stage": "transactional_event_delivery",
 			"rating_enabled": true, "matchmaking_enabled": true, "result_ingestion_enabled": true,
-			"planned_room_sizes": []int{5, 6, 7},
+			"outbox_delivery_enabled": true,
+			"planned_room_sizes":      []int{5, 6, 7},
 		})
 	})
 	s.registerResultRoutes(mux, results, expectedToken)

@@ -7,18 +7,19 @@ or stage status change.
 | --- | --- | --- | --- |
 | Process entry | `cmd/server` | Load config, signals, logging, call application | Implemented |
 | Simulator | `internal/simulator`, `cmd/simulator` | Joint speed, timeout, fairness and calibration experiments | Stage 3 complete |
-| Application | `internal/application` | Compose ticket, matching, result and rating use cases | Stage 4 in progress |
+| Application | `internal/application` | Compose ticket, matching, result, rating and event-delivery use cases | Stage 4 in progress |
 | HTTP | `internal/httpapi` | Health, readiness, capabilities and authenticated result ingestion | Result endpoint implemented |
 | Configuration | `internal/config` | Validated environment configuration | Implemented |
-| PostgreSQL | `internal/postgres` | Pool, migrations, ticket/match/rating queues and atomic state transitions | Stage 4 in progress |
+| PostgreSQL | `internal/postgres` | Pool, migrations, ticket/match/rating/outbox queues and atomic state transitions | Stage 4 in progress |
 | Tournament | `internal/tournament` | Versioned ticket, result and deadline lifecycle contracts | Stage 4 in progress |
-| Workers | `internal/worker` | Bounded matchmaking, deadline expiry and time-ordered rating processing | Baseline workers implemented |
+| Workers | `internal/worker` | Bounded matchmaking, deadline expiry, ordered rating and outbox delivery | Stage 4 workers implemented |
+| Event delivery | `internal/eventdelivery` | Authenticated, idempotent HTTPS publication to the game backend | Implemented |
 | Observability | `internal/observability` | Structured process logging | Foundation implemented |
 | Rating | `pkg/rating` | Baseline updates, placement predictions and calibration contracts | Persisted by stage-4 worker |
 | Matching | `pkg/matchmaking` | Bounded fair selection and deterministic retry scheduling | Stage 3 complete |
 | Current API | `api/openapi.yaml` | Machine-readable health, capability and result endpoints | Implemented |
 | Planned API | `docs/api-contract.md` | Remaining ticket, room and rating integration boundary | Draft |
-| Persistence | `migrations` | Embedded schema including ticket, worker and result invariants | Stage 4 in progress |
+| Persistence | `migrations` | Embedded schema including ticket, worker, result and outbox invariants | Stage 4 in progress |
 
 ## Dependency direction
 
@@ -36,5 +37,5 @@ or stage status change.
 | Fast but unfair room packing | Whole-room hard fairness constraints remain separate from fill priority |
 | Queue fragmentation | Match on predicted outcomes; avoid hard partitions per rating feature |
 | Duplicate assignment or rating | Lease fencing, aggregate versions, database uniqueness and event idempotency |
-| Lost external event after commit | Transactional outbox in stage 4 |
+| Lost or duplicated external event | Transactional outbox, fenced retries and receiver deduplication by event id |
 | Inflated accuracy claims | Time-ordered evaluation on real data; simulations validate behavior only |

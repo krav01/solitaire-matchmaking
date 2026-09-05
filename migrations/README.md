@@ -26,5 +26,9 @@ idempotent verified-result ingestion.
 oldest unprocessed result remains the global head so a retry or active lease
 cannot let a later outcome overtake it.
 
+`000006_outbox_delivery` constrains delivery state and adds the partial index
+used to preserve aggregate order while independent events are delivered in
+parallel.
+
 Rollback uses a reviewed compensating forward migration. Destructive automatic
 down migrations are intentionally unsupported.

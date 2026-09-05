@@ -10,8 +10,10 @@ import (
 func TestLoad(t *testing.T) {
 	t.Parallel()
 	base := map[string]string{
-		"DATABASE_URL": "test-database-address",
-		"API_TOKEN":    strings.Repeat("x", 32),
+		"DATABASE_URL":          "test-database-address",
+		"API_TOKEN":             strings.Repeat("x", 32),
+		"OUTBOX_DELIVERY_URL":   "https://backend.example.com/events",
+		"OUTBOX_DELIVERY_TOKEN": strings.Repeat("y", 32),
 	}
 	tests := []struct {
 		name    string
@@ -20,14 +22,19 @@ func TestLoad(t *testing.T) {
 	}{
 		{name: "valid defaults"},
 		{name: "valid overrides", values: map[string]string{"HTTP_ADDR": "0.0.0.0:9090", "DB_MAX_CONNS": "20", "LOG_LEVEL": "debug"}},
-		{name: "valid worker overrides", values: map[string]string{"MATCH_WORKER_BATCH_SIZE": "16", "MATCH_WORKER_CONCURRENCY": "4", "MATCH_WORKER_LEASE": "5s", "RESULT_DEADLINE_BATCH_SIZE": "8", "RESULT_DEADLINE_POLL_INTERVAL": "2s", "RATING_WORKER_LEASE": "8s", "RATING_WORKER_POLL_INTERVAL": "200ms", "RATING_WORKER_FAILURE_BACKOFF": "3s"}},
+		{name: "valid worker overrides", values: map[string]string{"MATCH_WORKER_BATCH_SIZE": "16", "MATCH_WORKER_CONCURRENCY": "4", "MATCH_WORKER_LEASE": "5s", "RESULT_DEADLINE_BATCH_SIZE": "8", "RESULT_DEADLINE_POLL_INTERVAL": "2s", "RATING_WORKER_LEASE": "8s", "RATING_WORKER_POLL_INTERVAL": "200ms", "RATING_WORKER_FAILURE_BACKOFF": "3s", "OUTBOX_WORKER_BATCH_SIZE": "16", "OUTBOX_WORKER_CONCURRENCY": "4", "OUTBOX_WORKER_LEASE": "20s", "OUTBOX_REQUEST_TIMEOUT": "4s", "OUTBOX_RETRY_BASE_DELAY": "2s", "OUTBOX_RETRY_MAX_DELAY": "30s"}},
 		{name: "missing database URL", values: map[string]string{"DATABASE_URL": ""}, wantErr: true},
 		{name: "short API token", values: map[string]string{"API_TOKEN": "short"}, wantErr: true},
+		{name: "missing outbox URL", values: map[string]string{"OUTBOX_DELIVERY_URL": ""}, wantErr: true},
+		{name: "short outbox token", values: map[string]string{"OUTBOX_DELIVERY_TOKEN": "short"}, wantErr: true},
 		{name: "invalid listen port", values: map[string]string{"HTTP_ADDR": "127.0.0.1:70000"}, wantErr: true},
 		{name: "unbounded connection pool", values: map[string]string{"DB_MAX_CONNS": "1001"}, wantErr: true},
 		{name: "long readiness timeout", values: map[string]string{"READINESS_TIMEOUT": "6s"}, wantErr: true},
 		{name: "concurrency exceeds batch", values: map[string]string{"MATCH_WORKER_BATCH_SIZE": "2", "MATCH_WORKER_CONCURRENCY": "3"}, wantErr: true},
 		{name: "stale retry is too slow", values: map[string]string{"MATCH_WORKER_STALE_RETRY_DELAY": "2s"}, wantErr: true},
+		{name: "outbox concurrency exceeds batch", values: map[string]string{"OUTBOX_WORKER_BATCH_SIZE": "2", "OUTBOX_WORKER_CONCURRENCY": "3"}, wantErr: true},
+		{name: "outbox request can exceed lease", values: map[string]string{"OUTBOX_WORKER_LEASE": "5s", "OUTBOX_REQUEST_TIMEOUT": "5s"}, wantErr: true},
+		{name: "outbox retry range is reversed", values: map[string]string{"OUTBOX_RETRY_BASE_DELAY": "10s", "OUTBOX_RETRY_MAX_DELAY": "5s"}, wantErr: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
