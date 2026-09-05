@@ -98,9 +98,9 @@ components:
         service:
           const: solitaire-matchmaking
         stage:
-          const: result_finalization
+          const: baseline_rating_persistence
         rating_enabled:
-          const: false
+          const: true
         matchmaking_enabled:
           const: true
         result_ingestion_enabled:

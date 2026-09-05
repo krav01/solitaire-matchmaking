@@ -7,14 +7,14 @@ or stage status change.
 | --- | --- | --- | --- |
 | Process entry | `cmd/server` | Load config, signals, logging, call application | Implemented |
 | Simulator | `internal/simulator`, `cmd/simulator` | Joint speed, timeout, fairness and calibration experiments | Stage 3 complete |
-| Application | `internal/application` | Compose ticket, matching and result use cases | Stage 4 in progress |
+| Application | `internal/application` | Compose ticket, matching, result and rating use cases | Stage 4 in progress |
 | HTTP | `internal/httpapi` | Health, readiness, capabilities and authenticated result ingestion | Result endpoint implemented |
 | Configuration | `internal/config` | Validated environment configuration | Implemented |
-| PostgreSQL | `internal/postgres` | Pool, migrations, ticket/match queues and atomic result finalization | Stage 4 in progress |
+| PostgreSQL | `internal/postgres` | Pool, migrations, ticket/match/rating queues and atomic state transitions | Stage 4 in progress |
 | Tournament | `internal/tournament` | Versioned ticket, result and deadline lifecycle contracts | Stage 4 in progress |
-| Workers | `internal/worker` | Bounded matchmaking claims, retries and result-deadline expiry | Matchmaking and deadline workers implemented |
+| Workers | `internal/worker` | Bounded matchmaking, deadline expiry and time-ordered rating processing | Baseline workers implemented |
 | Observability | `internal/observability` | Structured process logging | Foundation implemented |
-| Rating | `pkg/rating` | Baseline updates, placement predictions and calibration contracts | Stage 2 complete |
+| Rating | `pkg/rating` | Baseline updates, placement predictions and calibration contracts | Persisted by stage-4 worker |
 | Matching | `pkg/matchmaking` | Bounded fair selection and deterministic retry scheduling | Stage 3 complete |
 | Current API | `api/openapi.yaml` | Machine-readable health, capability and result endpoints | Implemented |
 | Planned API | `docs/api-contract.md` | Remaining ticket, room and rating integration boundary | Draft |

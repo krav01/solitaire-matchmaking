@@ -22,5 +22,9 @@ runs after the claim transaction releases its row locks.
 `000004_result_finalization` enforces canonical SHA-256 request digests for
 idempotent verified-result ingestion.
 
+`000005_rating_worker` adds durable rating retry times and fenced leases. The
+oldest unprocessed result remains the global head so a retry or active lease
+cannot let a later outcome overtake it.
+
 Rollback uses a reviewed compensating forward migration. Destructive automatic
 down migrations are intentionally unsupported.

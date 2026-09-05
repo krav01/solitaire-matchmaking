@@ -51,6 +51,17 @@ func Run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	if err != nil {
 		return err
 	}
+	ratingQueue, err := postgres.NewRatingQueue(pool)
+	if err != nil {
+		return err
+	}
+	ratingRunner, err := worker.NewRatingRunner(ratingQueue, logger, worker.RatingRunnerOptions{
+		LeaseDuration: cfg.RatingLease, PollInterval: cfg.RatingPollInterval,
+		FailureBackoff: cfg.RatingFailureBackoff,
+	})
+	if err != nil {
+		return err
+	}
 	matchQueue, err := postgres.NewMatchmakingQueue(pool)
 	if err != nil {
 		return err
@@ -73,7 +84,7 @@ func Run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	}
 	workerCtx, stopWorker := context.WithCancel(ctx)
 	var workers sync.WaitGroup
-	workers.Add(2)
+	workers.Add(3)
 	go func() {
 		defer workers.Done()
 		runner.Run(workerCtx)
@@ -82,10 +93,14 @@ func Run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 		defer workers.Done()
 		deadlineRunner.Run(workerCtx)
 	}()
+	go func() {
+		defer workers.Done()
+		ratingRunner.Run(workerCtx)
+	}()
 	defer func() {
 		stopWorker()
 		workers.Wait()
 	}()
-	logger.Info("server started", "address", listener.Addr().String(), "stage", "result_finalization")
+	logger.Info("server started", "address", listener.Addr().String(), "stage", "baseline_rating_persistence")
 	return server.Serve(ctx, listener)
 }

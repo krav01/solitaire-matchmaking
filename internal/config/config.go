@@ -28,6 +28,9 @@ type Config struct {
 	MatchStaleRetryDelay time.Duration
 	ResultDeadlineBatch  int
 	ResultDeadlinePoll   time.Duration
+	RatingLease          time.Duration
+	RatingPollInterval   time.Duration
+	RatingFailureBackoff time.Duration
 }
 
 // Load accepts an environment accessor to keep tests isolated from os.Environ.
@@ -41,6 +44,8 @@ func Load(getenv func(string) string) (Config, error) {
 		MatchPollInterval: 100 * time.Millisecond, MatchFailureBackoff: time.Second,
 		MatchStaleRetryDelay: 50 * time.Millisecond,
 		ResultDeadlineBatch:  32, ResultDeadlinePoll: time.Second,
+		RatingLease: 10 * time.Second, RatingPollInterval: 100 * time.Millisecond,
+		RatingFailureBackoff: time.Second,
 	}
 	if value := getenv("HTTP_ADDR"); value != "" {
 		c.HTTPAddr = value
@@ -81,6 +86,9 @@ func Load(getenv func(string) string) (Config, error) {
 		{"MATCH_WORKER_FAILURE_BACKOFF", &c.MatchFailureBackoff},
 		{"MATCH_WORKER_STALE_RETRY_DELAY", &c.MatchStaleRetryDelay},
 		{"RESULT_DEADLINE_POLL_INTERVAL", &c.ResultDeadlinePoll},
+		{"RATING_WORKER_LEASE", &c.RatingLease},
+		{"RATING_WORKER_POLL_INTERVAL", &c.RatingPollInterval},
+		{"RATING_WORKER_FAILURE_BACKOFF", &c.RatingFailureBackoff},
 	} {
 		if value := getenv(entry.key); value != "" {
 			d, err := time.ParseDuration(value)

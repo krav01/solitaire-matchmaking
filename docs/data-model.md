@@ -61,5 +61,7 @@ its outbox event atomically.
 The physical result record represents one complete, game-backend-verified room
 outcome with participant rows. Optional feature columns remain nullable so absent
 telemetry cannot become a zero observation. Rating snapshots are copied onto
-tickets and never replaced by results from the room being matched. Finalized
-results remain unprocessed until the time-ordered rating worker is implemented.
+tickets and never replaced by results from the room being matched. The rating
+worker claims the oldest available unprocessed result, blocks overtaking during
+leases or retries, and atomically writes immutable updates, current estimates,
+the processed marker and a `result.rated` outbox event.

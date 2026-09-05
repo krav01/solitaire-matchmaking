@@ -87,8 +87,8 @@ func (store *ResultStore) FinalizeResult(ctx context.Context, command tournament
 	if _, err := tx.Exec(ctx, `
 INSERT INTO verified_results (
     event_id, request_digest, room_id, room_capacity, mode_id, deck_id,
-    scoring_rules_version, finished_at, available_at, accepted_at
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+    scoring_rules_version, finished_at, available_at, accepted_at, next_attempt_at
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $9)`,
 		command.EventID, digest, command.RoomID, room.capacity, command.ModeID, command.DeckID,
 		command.ScoringRulesVersion, command.FinishedAt, command.AvailableAt, command.AcceptedAt,
 	); err != nil {

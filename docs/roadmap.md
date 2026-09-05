@@ -34,6 +34,7 @@
 - [x] idempotent ticket acceptance, assignment and cancellation
 - [x] room/session state transitions and bounded worker claims
 - [x] verified-result ingestion, deadlines and finalized standings
+- [x] strictly time-ordered baseline rating persistence
 - transactional outbox and retryable delivery
 - PostgreSQL integration and end-to-end tests
 
