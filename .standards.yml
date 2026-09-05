@@ -1,0 +1,30 @@
+version: 1.1.0
+maturity: high-load-critical
+source: krav01/dev-standards
+
+controls:
+  reusable_ci: false
+  standards_drift: false
+  lint: true
+  vulncheck: true
+  race: true
+  database_integration: true
+  fuzz: project-specific
+  architecture_guard: project-specific
+  dependency_review: false
+
+exceptions:
+  - control: reusable_ci
+    reason: This repository is public while the central dev-standards repository is private; GitHub does not allow a public caller to invoke a private reusable workflow.
+    revisit: Enable when the standards workflow source is made accessible to public callers or this repository becomes private.
+  - control: standards_drift
+    reason: The central drift workflow is private and cannot be called from this public repository.
+    revisit: Enable with the same access change as reusable_ci.
+  - control: dependency_review
+    reason: Not currently enforced by the main CI workflow.
+    revisit: Enable when repository settings and CI policy support it without duplicating existing checks.
+
+local_overrides:
+  - The project-specific AGENTS.md invariants take precedence over generic baseline guidance.
+  - PostgreSQL integration tests remain local because they model project-specific transactional and concurrency behavior.
+  - Existing project CI remains authoritative where it is stricter or more specific than the reusable baseline.
