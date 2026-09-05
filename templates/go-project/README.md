@@ -8,6 +8,8 @@ Reusable baseline for new Go repositories. Copy the relevant files into a new re
 - `docs/project-map.md` — compact persistent project context.
 - `docs/definition-of-done.md` — risk classification and verification depth.
 - `docs/maturity-levels.md` — `basic`, `production`, and `high-load / critical` control levels.
+- `docs/design-principles.md` — Clean Code, DDD, Clean Architecture, SOLID, and package design guidance.
+- `docs/database-guidelines.md` — Go/SQL/PostgreSQL persistence, transactions, pools, constraints, indexes, migrations, idempotency, and database testing.
 - `docs/decisions/README.md` — decision index.
 - `docs/decisions/ADR-TEMPLATE.md` — durable architecture-decision template.
 - `docs/incidents.md` — escaped-defect to regression-test/guardrail workflow.
@@ -23,9 +25,10 @@ Reusable baseline for new Go repositories. Copy the relevant files into a new re
 2. Choose the maturity level using `docs/maturity-levels.md`.
 3. Fill `docs/project-map.md` with actual boundaries and risks.
 4. Define project-specific invariants in `AGENTS.md`.
-5. Record irreversible or expensive architectural choices as ADRs and add them to the decision index.
-6. Keep CI cheap on pull requests and reserve heavy race/security/performance gates for high-risk changes or `main`.
-7. Enable GitHub Dependency Graph and branch/ruleset protection when available.
+5. Apply `docs/design-principles.md` and `docs/database-guidelines.md` where relevant.
+6. Record irreversible or expensive architectural choices as ADRs and add them to the decision index.
+7. Keep CI cheap on pull requests and reserve heavy race/security/performance gates for high-risk changes or `main`.
+8. Enable GitHub Dependency Graph and branch/ruleset protection when available.
 
 ## Ongoing workflow
 
@@ -33,6 +36,7 @@ Reusable baseline for new Go repositories. Copy the relevant files into a new re
 - Escaped defects follow `docs/incidents.md`: regression test first, then a reusable guardrail when justified.
 - Production/high-load projects periodically run the architecture health checklist.
 - Prefer patterns from `docs/go-patterns.md` as design guidance, not blind copy-paste.
+- Review persistence changes against `docs/database-guidelines.md` and domain/architecture changes against `docs/design-principles.md`.
 
 ## Principle
 
