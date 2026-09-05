@@ -55,7 +55,9 @@ reservations and settlement.
 
 See [project map](docs/project-map.md), [architecture decisions](docs/architecture.md),
 [data model](docs/data-model.md), [quality measures](docs/quality-metrics.md) and
-[roadmap](docs/roadmap.md).
+[roadmap](docs/roadmap.md). Engineering controls are defined by the
+[Definition of Done](docs/definition-of-done.md), [testing strategy](docs/testing.md),
+[security model](docs/security.md), and [review checklist](docs/review-checklist.md).
 
 ## Run locally
 

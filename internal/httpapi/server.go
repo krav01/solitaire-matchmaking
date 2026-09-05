@@ -197,7 +197,7 @@ func (s *Server) Serve(ctx context.Context, listener net.Listener) error {
 		return fmt.Errorf("serve HTTP: %w", err)
 	case <-ctx.Done():
 		s.draining.Store(true)
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), s.shutdown)
+		shutdownCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), s.shutdown)
 		defer cancel()
 		if err := s.http.Shutdown(shutdownCtx); err != nil {
 			if closeErr := s.http.Close(); closeErr != nil {

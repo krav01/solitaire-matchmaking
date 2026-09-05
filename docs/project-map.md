@@ -20,6 +20,7 @@ or stage status change.
 | Current API | `api/openapi.yaml` | Machine-readable operational, ticket, room, rating, result and outbound event contracts | Integration surface implemented |
 | Integration | `docs/api-contract.md`, `examples/game-backend` | API contract, event payload catalogue, retry rules and tested Go receiver | HTTP boundary complete; Stage 6 validation remains |
 | Persistence | `migrations` | Embedded schema including ticket, worker, result and outbox invariants | Stage 4 complete |
+| Engineering guardrails | `.github`, `scripts/check-architecture.sh`, `docs/definition-of-done.md` | Risk-based review, dependency, architecture, fuzz, race, lint and security checks | Enforced in CI |
 
 ## Dependency direction
 
