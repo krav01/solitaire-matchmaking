@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/krav01/solitaire-matchmaking/internal/config"
+	"github.com/krav01/solitaire-matchmaking/internal/eventdelivery"
 	"github.com/krav01/solitaire-matchmaking/internal/httpapi"
 	"github.com/krav01/solitaire-matchmaking/internal/postgres"
 	"github.com/krav01/solitaire-matchmaking/internal/tournament"
@@ -78,13 +79,31 @@ func Run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	if err != nil {
 		return err
 	}
+	outboxQueue, err := postgres.NewOutboxQueue(pool)
+	if err != nil {
+		return err
+	}
+	outboxPublisher, err := eventdelivery.NewHTTPPublisher(
+		cfg.OutboxDeliveryURL, cfg.OutboxDeliveryToken, cfg.OutboxRequestTimeout,
+	)
+	if err != nil {
+		return err
+	}
+	outboxRunner, err := worker.NewOutboxRunner(outboxQueue, outboxPublisher, logger, worker.OutboxRunnerOptions{
+		BatchSize: cfg.OutboxBatchSize, Concurrency: cfg.OutboxConcurrency,
+		LeaseDuration: cfg.OutboxLease, PollInterval: cfg.OutboxPollInterval,
+		RetryBaseDelay: cfg.OutboxRetryBaseDelay, RetryMaxDelay: cfg.OutboxRetryMaxDelay,
+	})
+	if err != nil {
+		return err
+	}
 	listener, err := (&net.ListenConfig{}).Listen(ctx, "tcp", cfg.HTTPAddr)
 	if err != nil {
 		return fmt.Errorf("listen HTTP: %w", err)
 	}
 	workerCtx, stopWorker := context.WithCancel(ctx)
 	var workers sync.WaitGroup
-	workers.Add(3)
+	workers.Add(4)
 	go func() {
 		defer workers.Done()
 		runner.Run(workerCtx)
@@ -97,10 +116,14 @@ func Run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 		defer workers.Done()
 		ratingRunner.Run(workerCtx)
 	}()
+	go func() {
+		defer workers.Done()
+		outboxRunner.Run(workerCtx)
+	}()
 	defer func() {
 		stopWorker()
 		workers.Wait()
 	}()
-	logger.Info("server started", "address", listener.Addr().String(), "stage", "baseline_rating_persistence")
+	logger.Info("server started", "address", listener.Addr().String(), "stage", "transactional_event_delivery")
 	return server.Serve(ctx, listener)
 }

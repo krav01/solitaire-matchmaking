@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Solitaire Matchmaking API
-  version: 0.2.0
+  version: 0.3.0
   description: Implemented service health, capability and verified-result endpoints.
 servers:
   - url: http://127.0.0.1:8080
@@ -93,17 +93,19 @@ components:
           type: string
     Capabilities:
       type: object
-      required: [service, stage, rating_enabled, matchmaking_enabled, result_ingestion_enabled, planned_room_sizes]
+      required: [service, stage, rating_enabled, matchmaking_enabled, result_ingestion_enabled, outbox_delivery_enabled, planned_room_sizes]
       properties:
         service:
           const: solitaire-matchmaking
         stage:
-          const: baseline_rating_persistence
+          const: transactional_event_delivery
         rating_enabled:
           const: true
         matchmaking_enabled:
           const: true
         result_ingestion_enabled:
+          const: true
+        outbox_delivery_enabled:
           const: true
         planned_room_sizes:
           type: array

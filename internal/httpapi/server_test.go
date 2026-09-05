@@ -83,13 +83,14 @@ func TestServerCapabilitiesRequireAuthentication(t *testing.T) {
 			}
 			if tt.want == http.StatusOK {
 				var body struct {
-					Stage         string `json:"stage"`
-					RatingEnabled bool   `json:"rating_enabled"`
+					Stage                 string `json:"stage"`
+					RatingEnabled         bool   `json:"rating_enabled"`
+					OutboxDeliveryEnabled bool   `json:"outbox_delivery_enabled"`
 				}
 				if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
 					t.Fatalf("decode capabilities: %v", err)
 				}
-				if body.Stage != "baseline_rating_persistence" || !body.RatingEnabled {
+				if body.Stage != "transactional_event_delivery" || !body.RatingEnabled || !body.OutboxDeliveryEnabled {
 					t.Fatalf("capabilities = %+v", body)
 				}
 			}

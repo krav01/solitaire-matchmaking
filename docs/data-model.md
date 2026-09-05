@@ -14,7 +14,7 @@ require validation against production traffic before release.
 | Session | room, ticket, player, seat | state, start/submission timestamps |
 | Verified result | unique event id, room/player/session, rules version | normalized optional features |
 | Rating update | player, source event, model version, before/after estimates | processing timestamp |
-| Outbox event | aggregate/version, event type, serialized payload | attempts, delivery time |
+| Outbox event | event id, aggregate/version, event type, serialized payload | availability, lease, attempts, error, delivery time |
 
 Required integrity rules for stage 4:
 
@@ -28,6 +28,7 @@ Required integrity rules for stage 4:
 - a completed room cannot change policy, model, deck or rules versions;
 - state change and its outbox event commit together;
 - matching workers claim bounded batches and do not hold locks during scoring.
+- delivered outbox events are unclaimed and delivery errors remain bounded.
 
 Primary reads are: due queued tickets by retry time and age, forming rooms by
 tournament and available seats, sessions by room, unprocessed verified results,
@@ -65,3 +66,11 @@ tickets and never replaced by results from the room being matched. The rating
 worker claims the oldest available unprocessed result, blocks overtaking during
 leases or retries, and atomically writes immutable updates, current estimates,
 the processed marker and a `result.rated` outbox event.
+
+The outbox worker claims due aggregate heads with `FOR UPDATE SKIP LOCKED` and
+releases row locks before HTTPS delivery. Events from independent aggregates are
+concurrent; a lower undelivered aggregate version blocks a later one. Claim-token
+and database-time lease checks fence delivery acknowledgement and retry updates.
+Failures move `available_at` forward with a capped exponential delay. A `2xx`
+response marks `delivered_at` and clears the lease and prior error. The event id
+is the receiver's deduplication identity because delivery is at least once.

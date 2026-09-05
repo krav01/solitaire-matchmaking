@@ -1,3 +1,2 @@
-// Package worker runs bounded matchmaking and result-deadline work. Outbox
-// delivery and time-ordered rating processing remain separate responsibilities.
+// Package worker runs bounded matchmaking, rating and event-delivery work.
 package worker

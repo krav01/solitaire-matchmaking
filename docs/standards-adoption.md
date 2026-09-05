@@ -1,6 +1,6 @@
 # Development standards adoption
 
-This project adopts `krav01/dev-standards` baseline version `1.1.0` at the `high-load-critical` maturity level.
+This project adopts `krav01/dev-standards` baseline version `1.4.0` at the `high-load-critical` maturity level.
 
 ## Precedence
 
