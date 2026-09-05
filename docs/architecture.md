@@ -57,8 +57,8 @@ using information available at the cutoff time and evaluates later outcomes.
 
 **Status:** accepted.
 
-PostgreSQL will store tickets, room membership, sessions, verified outcomes,
-rating history and outgoing events. Atomic state transitions will use explicit,
+PostgreSQL stores tickets, room membership, sessions, verified outcomes,
+rating history and outgoing events. Atomic state transitions use explicit,
 parameterized SQL transactions. Application startup checks connectivity and
 never applies schema changes. The separate migration runner embeds reviewed,
 checksummed SQL and serializes migration batches with a PostgreSQL advisory lock.
