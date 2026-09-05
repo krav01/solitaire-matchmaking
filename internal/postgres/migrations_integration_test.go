@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/krav01/solitaire-matchmaking/internal/postgres"
+	"github.com/krav01/solitaire-matchmaking/migrations"
 )
 
 func TestMigrationsApplyToPostgreSQL(t *testing.T) {
@@ -22,13 +23,18 @@ func TestMigrationsApplyToPostgreSQL(t *testing.T) {
 		t.Fatalf("open PostgreSQL: %v", err)
 	}
 	defer pool.Close()
+	catalog, err := migrations.Load()
+	if err != nil {
+		t.Fatalf("load migration catalog: %v", err)
+	}
+	expectedMigrations := len(catalog)
 
 	applied, err := postgres.ApplyMigrations(ctx, pool)
 	if err != nil {
 		t.Fatalf("first ApplyMigrations() error = %v", err)
 	}
-	if applied < 0 || applied > 2 {
-		t.Fatalf("first ApplyMigrations() = %d, want zero to two pending migrations", applied)
+	if applied < 0 || applied > expectedMigrations {
+		t.Fatalf("first ApplyMigrations() = %d, want zero to %d pending migrations", applied, expectedMigrations)
 	}
 	applied, err = postgres.ApplyMigrations(ctx, pool)
 	if err != nil {
@@ -63,7 +69,7 @@ func TestMigrationsApplyToPostgreSQL(t *testing.T) {
 	if err := pool.QueryRow(ctx, "SELECT count(*), min(length(checksum)) FROM schema_migrations").Scan(&migrationCount, &minimumChecksumLength); err != nil {
 		t.Fatalf("read migration ledger: %v", err)
 	}
-	if migrationCount != 2 || minimumChecksumLength != 64 {
+	if migrationCount != expectedMigrations || minimumChecksumLength != 64 {
 		t.Fatalf("migration count = %d, minimum checksum length = %d", migrationCount, minimumChecksumLength)
 	}
 }
