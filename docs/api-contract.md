@@ -14,6 +14,8 @@ The implemented inbound API and outbound webhook envelope are defined in
 | POST /v1/tickets | API_TOKEN bearer | Accept an eligible reserved entry and rating snapshot |
 | GET /v1/tickets/{ticket_id} | API_TOKEN bearer | Read queue or assignment state |
 | DELETE /v1/tickets/{ticket_id} | API_TOKEN bearer | Cancel an eligible queued entry |
+| GET /v1/rooms/{room_id} | API_TOKEN bearer | Read composition and lifecycle state |
+| GET /v1/ratings/{player_id}?mode_id=... | API_TOKEN bearer | Read the current persisted rating |
 | POST /v1/results | API_TOKEN bearer | Complete, server-verified room result |
 
 Ticket acceptance uses `entry_id` as its idempotency identity. The game backend
@@ -43,6 +45,18 @@ returns the stored decision. Assigned and expired tickets return
 | 409 | idempotency_conflict | Reconcile reused entry or cancellation identity |
 | 409 | ticket_not_queued | Stop cancellation and read current state |
 | 500 | internal_error | Retry persisted input with bounded backoff |
+
+Room reads return immutable configuration identities, current lifecycle status
+and timestamps, aggregate version, and members ordered by seat. Each member
+contains the ticket, player and session identities plus the current session
+status and its available lifecycle timestamps. Forming rooms return an empty
+`members` array rather than null.
+
+Rating reads require exactly one non-empty `mode_id`. They return the most
+recently updated persisted estimate for the player and mode, including its
+`model_version` and storage `revision`. A player without a persisted rating for
+that mode returns `rating_not_found`; callers may continue using their approved
+initial estimate until a verified result has produced the first persisted update.
 
 Results use the body field `event_id` as their idempotency identity, not an
 Idempotency-Key header. Persist the request before sending it and reuse that
@@ -116,15 +130,3 @@ leases can cause duplicate requests, including stale retries; receivers must
 deduplicate and prevent stale events from overwriting newer state. Cross-aggregate
 dependencies require reconciliation by identity. Settlement remains owned by
 the game backend.
-
-## Planned HTTP surface
-
-These read adapters are not registered yet:
-
-| Endpoint | Intended purpose |
-| --- | --- |
-| GET /v1/rooms/{room_id} | Read composition and lifecycle state |
-| GET /v1/ratings/{player_id}?mode_id=... | Read a versioned rating |
-
-The ticket endpoints and assignment events provide the external onboarding path.
-Room and rating queries remain integration work for diagnostics and reconciliation.

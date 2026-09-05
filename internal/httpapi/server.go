@@ -33,6 +33,11 @@ type TicketManager interface {
 	Get(context.Context, string) (tournament.TicketState, error)
 }
 
+type QueryReader interface {
+	GetRoom(context.Context, string) (tournament.RoomState, error)
+	GetRating(context.Context, string, string) (tournament.PlayerRating, error)
+}
+
 type Options struct {
 	APIToken         string
 	ReadinessTimeout time.Duration
@@ -46,9 +51,9 @@ type Server struct {
 	draining atomic.Bool
 }
 
-func New(check Readiness, tickets TicketManager, results ResultFinalizer, logger *slog.Logger, opts Options) (*Server, error) {
-	if check == nil || tickets == nil || results == nil || logger == nil {
-		return nil, errors.New("readiness checker, ticket manager, result finalizer and logger are required")
+func New(check Readiness, tickets TicketManager, results ResultFinalizer, queries QueryReader, logger *slog.Logger, opts Options) (*Server, error) {
+	if check == nil || tickets == nil || results == nil || queries == nil || logger == nil {
+		return nil, errors.New("readiness checker, ticket manager, result finalizer, query reader and logger are required")
 	}
 	if len(opts.APIToken) < 32 || opts.ReadinessTimeout <= 0 || opts.ReadinessTimeout > 5*time.Second || opts.ShutdownTimeout <= 0 {
 		return nil, errors.New("invalid HTTP server options")
@@ -86,6 +91,7 @@ func New(check Readiness, tickets TicketManager, results ResultFinalizer, logger
 	})
 	s.registerTicketRoutes(mux, tickets, expectedToken)
 	s.registerResultRoutes(mux, results, expectedToken)
+	s.registerQueryRoutes(mux, queries, expectedToken)
 	s.http = &http.Server{
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("X-Request-ID", rand.Text())

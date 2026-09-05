@@ -168,13 +168,45 @@ func newServerWithTickets(t *testing.T, tickets httpapi.TicketManager) *httpapi.
 
 func newServerWithTicketsAndResults(t *testing.T, check httpapi.Readiness, tickets httpapi.TicketManager, results httpapi.ResultFinalizer) *httpapi.Server {
 	t.Helper()
-	server, err := httpapi.New(check, tickets, results, slog.New(slog.NewTextHandler(io.Discard, nil)), httpapi.Options{
+	return newServerWithDependencies(t, check, tickets, results, &queryReaderStub{})
+}
+
+func newServerWithQueries(t *testing.T, queries httpapi.QueryReader) *httpapi.Server {
+	t.Helper()
+	return newServerWithDependencies(t, readinessStub{}, &ticketManagerStub{}, &resultFinalizerStub{}, queries)
+}
+
+func newServerWithDependencies(t *testing.T, check httpapi.Readiness, tickets httpapi.TicketManager, results httpapi.ResultFinalizer, queries httpapi.QueryReader) *httpapi.Server {
+	t.Helper()
+	server, err := httpapi.New(check, tickets, results, queries, slog.New(slog.NewTextHandler(io.Discard, nil)), httpapi.Options{
 		APIToken: testToken, ReadinessTimeout: time.Second, ShutdownTimeout: time.Second,
 	})
 	if err != nil {
 		t.Fatalf("New() error: %v", err)
 	}
 	return server
+}
+
+type queryReaderStub struct {
+	room      tournament.RoomState
+	roomErr   error
+	rating    tournament.PlayerRating
+	ratingErr error
+
+	roomID   string
+	playerID string
+	modeID   string
+}
+
+func (reader *queryReaderStub) GetRoom(_ context.Context, roomID string) (tournament.RoomState, error) {
+	reader.roomID = roomID
+	return reader.room, reader.roomErr
+}
+
+func (reader *queryReaderStub) GetRating(_ context.Context, playerID, modeID string) (tournament.PlayerRating, error) {
+	reader.playerID = playerID
+	reader.modeID = modeID
+	return reader.rating, reader.ratingErr
 }
 
 type ticketManagerStub struct {

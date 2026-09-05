@@ -29,6 +29,8 @@ func TestOpenAPIContractParsesAndResolvesLocalReferences(t *testing.T) {
 		"/v1/capabilities":        {"get"},
 		"/v1/tickets":             {"post"},
 		"/v1/tickets/{ticket_id}": {"get", "delete"},
+		"/v1/rooms/{room_id}":     {"get"},
+		"/v1/ratings/{player_id}": {"get"},
 		"/v1/results":             {"post"},
 	} {
 		pathItem := objectAt(t, document, "paths", path)

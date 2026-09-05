@@ -40,7 +40,11 @@ func Run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	if err != nil {
 		return err
 	}
-	server, err := httpapi.New(pool, ticketService, resultService, logger, httpapi.Options{
+	queryStore, err := postgres.NewQueryStore(pool)
+	if err != nil {
+		return err
+	}
+	server, err := httpapi.New(pool, ticketService, resultService, queryStore, logger, httpapi.Options{
 		APIToken: cfg.APIToken, ReadinessTimeout: cfg.ReadinessTimeout, ShutdownTimeout: cfg.ShutdownTimeout,
 	})
 	if err != nil {

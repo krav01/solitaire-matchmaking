@@ -8,7 +8,7 @@ or stage status change.
 | Process entry | `cmd/server` | Load config, signals, logging, call application | Implemented |
 | Simulator | `internal/simulator`, `cmd/simulator` | Joint speed, timeout, fairness and calibration experiments | Stage 3 complete |
 | Application | `internal/application` | Compose ticket, matching, result, rating and event-delivery use cases | Stage 4 complete |
-| HTTP | `internal/httpapi` | Health, readiness, capabilities, ticket lifecycle and verified result ingestion | Ticket and result endpoints implemented |
+| HTTP | `internal/httpapi` | Health, readiness, capabilities, ticket/result lifecycle and room/rating reads | Integration endpoints implemented |
 | Configuration | `internal/config` | Validated environment configuration | Implemented |
 | PostgreSQL | `internal/postgres` | Pool, migrations, ticket/match/rating/outbox queues and atomic state transitions | Stage 4 complete |
 | Tournament | `internal/tournament` | Versioned ticket, result and deadline lifecycle contracts | Stage 4 complete |
@@ -17,8 +17,8 @@ or stage status change.
 | Observability | `internal/observability` | Structured process logging | Foundation implemented |
 | Rating | `pkg/rating` | Baseline, versioned feature evaluation, model comparison and rollout contracts | Stage 5 complete; baseline active pending real evidence |
 | Matching | `pkg/matchmaking` | Bounded fair selection and deterministic retry scheduling | Stage 3 complete |
-| Current API | `api/openapi.yaml` | Machine-readable operational, ticket, result and outbound event contracts | Ticket lifecycle implemented |
-| Integration | `docs/api-contract.md`, `examples/game-backend` | Event payload catalogue, retry rules, tested Go receiver and remaining HTTP boundary | Stage 6 in progress |
+| Current API | `api/openapi.yaml` | Machine-readable operational, ticket, room, rating, result and outbound event contracts | Integration surface implemented |
+| Integration | `docs/api-contract.md`, `examples/game-backend` | API contract, event payload catalogue, retry rules and tested Go receiver | HTTP boundary complete; Stage 6 validation remains |
 | Persistence | `migrations` | Embedded schema including ticket, worker, result and outbox invariants | Stage 4 complete |
 
 ## Dependency direction

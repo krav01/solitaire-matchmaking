@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Solitaire Matchmaking API
-  version: 0.5.0
+  version: 0.6.0
   description: |
     Implemented HTTP endpoints and the outbound game-backend event contract.
     Every HTTP response includes `X-Request-ID`, `Cache-Control: no-store` and
@@ -235,6 +235,88 @@ paths:
                   value: {error: idempotency_conflict}
                 state:
                   value: {error: ticket_not_queued}
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /v1/rooms/{room_id}:
+    parameters:
+      - name: room_id
+        in: path
+        required: true
+        schema:
+          type: string
+          minLength: 1
+    get:
+      tags: [Integration]
+      summary: Read room composition and lifecycle state
+      operationId: getRoom
+      security:
+        - apiBearerAuth: []
+      responses:
+        "200":
+          description: Current room metadata, lifecycle timestamps and seat-ordered members.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoomState"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Room does not exist.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example: {error: room_not_found}
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /v1/ratings/{player_id}:
+    parameters:
+      - name: player_id
+        in: path
+        required: true
+        schema:
+          type: string
+          minLength: 1
+    get:
+      tags: [Integration]
+      summary: Read the current persisted player rating
+      operationId: getPlayerRating
+      description: |
+        Returns the most recently updated persisted estimate for the requested
+        player and mode. The model version and revision remain explicit so a
+        caller can reconcile model transitions.
+      security:
+        - apiBearerAuth: []
+      parameters:
+        - name: mode_id
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 1
+      responses:
+        "200":
+          description: Latest persisted rating for the player and mode.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlayerRating"
+        "400":
+          description: The required mode identity is missing or repeated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example: {error: invalid_rating_query}
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: No persisted rating exists for the player and mode.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example: {error: rating_not_found}
         "500":
           $ref: "#/components/responses/InternalError"
   /v1/results:
@@ -492,7 +574,7 @@ components:
       properties:
         error:
           type: string
-          enum: [unauthorized, invalid_ticket, invalid_cancellation, tournament_not_found, ticket_not_found, idempotency_conflict, ticket_not_queued, invalid_result, room_not_found, result_conflict, room_not_collecting, result_deadline_passed, participants_mismatch, internal_error]
+          enum: [unauthorized, invalid_ticket, invalid_cancellation, invalid_rating_query, tournament_not_found, ticket_not_found, rating_not_found, idempotency_conflict, ticket_not_queued, invalid_result, room_not_found, result_conflict, room_not_collecting, result_deadline_passed, participants_mismatch, internal_error]
     RatingEstimate:
       type: object
       additionalProperties: false
@@ -645,6 +727,72 @@ components:
           $ref: "#/components/schemas/Ticket"
         assignment:
           $ref: "#/components/schemas/Assignment"
+    RoomState:
+      type: object
+      additionalProperties: false
+      required: [room_id, tournament_id, tournament_version, mode_id, policy_version, rating_model_version, scoring_rules_version, settlement_version, deck_id, capacity, status, aggregate_version, created_at, fill_deadline, members]
+      properties:
+        room_id: {type: string, minLength: 1}
+        tournament_id: {type: string, minLength: 1}
+        tournament_version: {type: string, minLength: 1}
+        mode_id: {type: string, minLength: 1}
+        policy_version: {type: string, minLength: 1}
+        rating_model_version: {type: string, minLength: 1}
+        scoring_rules_version: {type: string, minLength: 1}
+        settlement_version: {type: string, minLength: 1}
+        deck_id: {type: string, minLength: 1}
+        capacity:
+          type: integer
+          enum: [5, 6, 7]
+        status:
+          type: string
+          enum: [forming, collecting, completed, expired, cancelled]
+        aggregate_version:
+          type: integer
+          format: int64
+          minimum: 1
+        created_at: {type: string, format: date-time}
+        fill_deadline: {type: string, format: date-time}
+        filled_at: {type: string, format: date-time}
+        result_deadline: {type: string, format: date-time}
+        completed_at: {type: string, format: date-time}
+        expired_at: {type: string, format: date-time}
+        cancelled_at: {type: string, format: date-time}
+        members:
+          type: array
+          maxItems: 7
+          description: Current room members ordered by seat.
+          items:
+            $ref: "#/components/schemas/RoomMember"
+    RoomMember:
+      type: object
+      additionalProperties: false
+      required: [ticket_id, player_id, session_id, seat, status, assigned_at]
+      properties:
+        ticket_id: {type: string, minLength: 1}
+        player_id: {type: string, minLength: 1}
+        session_id: {type: string, minLength: 1}
+        seat: {type: integer, minimum: 1, maximum: 7}
+        status:
+          type: string
+          enum: [allocated, playing, submitted, forfeited]
+        assigned_at: {type: string, format: date-time}
+        started_at: {type: string, format: date-time}
+        submitted_at: {type: string, format: date-time}
+        forfeited_at: {type: string, format: date-time}
+    PlayerRating:
+      type: object
+      additionalProperties: false
+      required: [player_id, mode_id, rating, revision]
+      properties:
+        player_id: {type: string, minLength: 1}
+        mode_id: {type: string, minLength: 1}
+        rating:
+          $ref: "#/components/schemas/RatingEstimate"
+        revision:
+          type: integer
+          format: int64
+          minimum: 0
     FinalizeResultRequest:
       type: object
       additionalProperties: false

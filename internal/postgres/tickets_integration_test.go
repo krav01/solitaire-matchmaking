@@ -178,6 +178,43 @@ func TestTicketLifecyclePostgreSQL(t *testing.T) {
 		t.Fatalf("missing Get() error = %v", err)
 	}
 
+	queryStore, err := postgres.NewQueryStore(pool)
+	if err != nil {
+		t.Fatalf("NewQueryStore() error = %v", err)
+	}
+	room, err := queryStore.GetRoom(ctx, roomID)
+	if err != nil || room.Status != tournament.RoomCollecting || room.AggregateVersion != 6 ||
+		len(room.Members) != 5 || room.Members[0].Seat != 1 || room.Members[4].Seat != 5 {
+		t.Fatalf("GetRoom() = %+v, error = %v", room, err)
+	}
+	if _, err := queryStore.GetRoom(ctx, prefix+"-missing-room"); !errors.Is(err, tournament.ErrRoomNotFound) {
+		t.Fatalf("GetRoom(missing) error = %v", err)
+	}
+
+	olderModelVersion := prefix + "-older-model"
+	mustExec(t, ctx, pool,
+		"INSERT INTO rating_models (model_version, parameters_digest) VALUES ($1, $2)",
+		olderModelVersion, strings.Repeat("c", 64),
+	)
+	ratingPlayerID := prefix + "-rated-player"
+	mustExec(t, ctx, pool, `
+INSERT INTO player_ratings (
+    player_id, mode_id, model_version, mean, uncertainty,
+    performance_deviation, games, updated_at, revision
+) VALUES
+    ($1, 'solitaire', $2, 24, 8, NULL, 3, $3, 7),
+    ($1, 'solitaire', $4, 26, 6, 2, 4, $5, 1)`,
+		ratingPlayerID, olderModelVersion, startedAt, modelVersion, startedAt.Add(time.Second),
+	)
+	currentRating, err := queryStore.GetRating(ctx, ratingPlayerID, "solitaire")
+	if err != nil || currentRating.Estimate.ModelVersion != modelVersion ||
+		currentRating.Estimate.Mean != 26 || currentRating.Revision != 1 {
+		t.Fatalf("GetRating() = %+v, error = %v", currentRating, err)
+	}
+	if _, err := queryStore.GetRating(ctx, prefix+"-missing-player", "solitaire"); !errors.Is(err, tournament.ErrRatingNotFound) {
+		t.Fatalf("GetRating(missing) error = %v", err)
+	}
+
 	retryAssignment := successful.command
 	retryAssignment.AssignedAt = retryAssignment.AssignedAt.Add(time.Minute)
 	retryAssignment.TicketEventID = prefix + "-ignored-assignment-event"
