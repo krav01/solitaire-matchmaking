@@ -44,8 +44,8 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
-      - name: Vet
-        run: go vet ./...
+      - name: GolangCI-Lint
+        run: go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13.2 run ./...
 
   security:
     name: Vulnerability scan
@@ -60,7 +60,7 @@ jobs:
           go-version-file: go.mod
           cache: true
       - name: Govulncheck
-        run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.7.0 ./...
 
   race:
     name: Race detector
