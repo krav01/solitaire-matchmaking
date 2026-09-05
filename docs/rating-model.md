@@ -95,6 +95,29 @@ metrics. Real verified outcomes are still required for accuracy claims; these
 contracts and deterministic tests establish leakage prevention, not predictive
 gain.
 
+## Model comparison and rollout
+
+Candidate and baseline predictions are paired with the same verified result, so
+the candidate cannot be evaluated on a more favorable holdout sample. Callers
+assign stable segment identifiers for relevant combinations such as mode, entry
+fee and region; each segment is additionally constrained to one mode,
+scoring-rules version and room size.
+
+The comparison reports candidate-minus-baseline Brier, log-loss and calibration
+deltas for every segment. Overall Brier and log loss are weighted by players,
+while overall calibration error is weighted by probability cells. An explicit
+policy sets the minimum rooms per segment, required overall Brier improvement
+and maximum allowed regression for every segment. There are no guessed default
+thresholds. A valid but weak candidate produces an ineligible report rather than
+a processing error.
+
+Activation consumes a self-consistent eligible report whose baseline matches the
+currently active version. Deployment state uses a monotonic revision fence,
+records an append-only transition and retains the replaced version as a single
+rollback target. Rollback consumes that target instead of allowing accidental
+version toggling. An integration adapter must persist the state and transition
+atomically before this contract is used in production.
+
 ## Current limits
 
 - The approximation treats pairwise placement comparisons as independent.
@@ -103,3 +126,5 @@ gain.
 - Predictive-accuracy claims require time-ordered real verified outcomes;
   fixed-seed property and simulation tests only establish invariants,
   reproducibility and expected learning behavior on synthetic data.
+- Production comparison thresholds and feature weights remain unset until real
+  EasyWin outcomes are available; the placement-only baseline stays active.
