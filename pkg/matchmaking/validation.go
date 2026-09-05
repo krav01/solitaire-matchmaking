@@ -13,8 +13,8 @@ func (c Candidate) Validate() error {
 	if c.TicketID == "" || c.PlayerID == "" {
 		return errors.New("candidate ticket and player ids are required")
 	}
-	if c.JoinedAt.IsZero() || c.SnapshotAt.IsZero() || c.SnapshotAt.Before(c.JoinedAt) {
-		return errors.New("candidate requires ordered join and snapshot times")
+	if c.JoinedAt.IsZero() || c.SnapshotAt.IsZero() || c.SnapshotAt.After(c.JoinedAt) {
+		return errors.New("candidate snapshot must be available no later than join time")
 	}
 	if err := c.Rating.Validate(); err != nil {
 		return fmt.Errorf("candidate rating: %w", err)

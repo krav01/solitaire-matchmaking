@@ -10,15 +10,15 @@ or stage status change.
 | Application | `internal/application` | Compose resources and future use cases | Foundation implemented |
 | HTTP | `internal/httpapi` | Health, readiness, authenticated capability API | Implemented |
 | Configuration | `internal/config` | Validated environment configuration | Implemented |
-| PostgreSQL | `internal/postgres` | Pool, migrations and transactional ticket lifecycle adapter | Stage 4 in progress |
+| PostgreSQL | `internal/postgres` | Pool, migrations, ticket lifecycle and leased matchmaking queue | Stage 4 in progress |
 | Tournament | `internal/tournament` | Versioned lifecycle contracts and ticket use cases | Stage 4 in progress |
-| Workers | `internal/worker` | Queue wake-ups, expiry and outbox delivery | Reserved for stage 4 |
+| Workers | `internal/worker` | Bounded matchmaking claims, fair processing, retries and ticket expiry | Matchmaking worker implemented |
 | Observability | `internal/observability` | Structured process logging | Foundation implemented |
 | Rating | `pkg/rating` | Baseline updates, placement predictions and calibration contracts | Stage 2 complete |
 | Matching | `pkg/matchmaking` | Bounded fair selection and deterministic retry scheduling | Stage 3 complete |
 | Current API | `api/openapi.yaml` | Machine-readable implemented endpoints | Implemented |
 | Planned API | `docs/api-contract.md` | Integration boundary awaiting use cases | Draft |
-| Persistence | `migrations` | Embedded, checksummed, forward-only PostgreSQL schema | Stage 4 in progress |
+| Persistence | `migrations` | Embedded schema including ticket lifecycle and worker leases | Stage 4 in progress |
 
 ## Dependency direction
 
@@ -35,6 +35,6 @@ or stage status change.
 | Outcome leakage into opponent selection | Candidates carry pre-game rating snapshots; current-game results are absent |
 | Fast but unfair room packing | Whole-room hard fairness constraints remain separate from fill priority |
 | Queue fragmentation | Match on predicted outcomes; avoid hard partitions per rating feature |
-| Duplicate assignment or rating | Database uniqueness and event idempotency in stage 4 |
+| Duplicate assignment or rating | Lease fencing, aggregate versions, database uniqueness and event idempotency |
 | Lost external event after commit | Transactional outbox in stage 4 |
 | Inflated accuracy claims | Time-ordered evaluation on real data; simulations validate behavior only |

@@ -32,7 +32,7 @@
 
 - [x] reviewed SQL migrations and explicit migration runner
 - [x] idempotent ticket acceptance, assignment and cancellation
-- room/session state transitions and bounded worker claims
+- [x] room/session state transitions and bounded worker claims
 - verified-result ingestion, deadlines and finalized standings
 - transactional outbox and retryable delivery
 - PostgreSQL integration and end-to-end tests

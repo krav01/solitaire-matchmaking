@@ -9,7 +9,7 @@ require validation against production traffic before release.
 | Tournament configuration | tournament id/version, mode, room size, fee/currency, rule versions | activation window |
 | Matching policy | policy version, rating-model version, hard limits | none after activation |
 | Rating model | model version, feature schema, parameters digest | none after activation |
-| Ticket | entry id, player id, tournament version, pre-game rating snapshot | state, room assignment, timestamps |
+| Ticket | entry id, player id, tournament version, pre-game rating snapshot | state, retry time, leased claim, assignment and timestamps |
 | Room | tournament/policy/model versions, deck id, capacity | state, fill/result deadlines, completion timestamps |
 | Session | room, ticket, player, seat | state, start/submission timestamps |
 | Verified result | unique event id, room/player/session, rules version | normalized optional features |
@@ -29,12 +29,14 @@ Required integrity rules for stage 4:
 - state change and its outbox event commit together;
 - matching workers claim bounded batches and do not hold locks during scoring.
 
-Primary planned reads are: queued tickets by tournament and age, forming rooms by
+Primary reads are: due queued tickets by retry time and age, forming rooms by
 tournament and available seats, sessions by room, unprocessed verified results,
 player rating by mode/model, and pending outbox events. Index design follows those
 queries. Partial indexes keep worker scans restricted to queued, forming,
-unprocessed or undelivered rows. Worker transactions will claim bounded batches
-with `FOR UPDATE SKIP LOCKED`; scoring remains outside row-locking transactions.
+unprocessed or undelivered rows. Matchmaking workers claim bounded batches with
+`FOR UPDATE SKIP LOCKED`, persist a lease token and release database locks before
+scoring. Every completion is fenced by the claim token; abandoned work becomes
+claimable after the lease expires.
 
 Ticket acceptance is idempotent by `entry_id`; cancellation is idempotent by
 ticket plus command id; assignment is idempotent by assignment id. Assignment
@@ -42,6 +44,11 @@ locks only the selected ticket and room, rechecks the immutable tournament and
 rating-model partition plus the room version scored by the matcher, chooses a bounded seat, and commits membership, session,
 state versions and outbox records together. A concurrent attempt for the final
 seat observes the filled room and can return to matching.
+
+Retry scheduling is absolute and derived from the immutable policy. A stale room
+version receives a short retry without relaxing fairness. At the ticket deadline,
+the worker performs one final match attempt and otherwise commits `expired` plus
+its outbox event atomically.
 
 The physical result record represents one complete, game-backend-verified room
 outcome with participant rows. Optional feature columns remain nullable so absent

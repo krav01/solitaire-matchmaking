@@ -19,6 +19,7 @@ const (
 	outboxTicketAccepted  = "ticket.accepted"
 	outboxTicketCancelled = "ticket.cancelled"
 	outboxTicketAssigned  = "ticket.assigned"
+	outboxTicketExpired   = "ticket.expired"
 	outboxRoomFilled      = "room.filled"
 )
 
@@ -53,11 +54,11 @@ INSERT INTO matchmaking_tickets (
     ticket_id, entry_id, request_digest, player_id, tournament_id,
     tournament_version, status, requested_at, snapshot_at, rating_mean,
     rating_uncertainty, rating_performance_deviation, rating_games,
-    rating_model_version, rating_updated_at, aggregate_version
+    rating_model_version, rating_updated_at, aggregate_version, next_attempt_at
 ) VALUES (
     $1, $2, $3, $4, $5,
     $6, $7, $8, $9, $10,
-    $11, $12, $13, $14, $15, $16
+    $11, $12, $13, $14, $15, $16, $8
 )
 ON CONFLICT DO NOTHING`,
 		ticket.ID, ticket.EntryID, digest, ticket.PlayerID, ticket.TournamentID,
@@ -160,7 +161,8 @@ WHERE ticket_id = $1 AND command_id = $2`, command.TicketID, command.CommandID).
 		stored.ticket.AggregateVersion++
 		if _, err := tx.Exec(ctx, `
 UPDATE matchmaking_tickets
-SET status = 'cancelled', cancelled_at = $2, aggregate_version = $3
+SET status = 'cancelled', cancelled_at = $2, aggregate_version = $3,
+    next_attempt_at = NULL, claim_token = NULL, claimed_until = NULL
 WHERE ticket_id = $1`, command.TicketID, command.CancelledAt, stored.ticket.AggregateVersion); err != nil {
 			return tournament.TicketMutation{}, fmt.Errorf("cancel ticket: %w", err)
 		}
@@ -202,6 +204,97 @@ INSERT INTO ticket_commands (
 		return tournament.TicketMutation{}, fmt.Errorf("commit ticket cancellation: %w", err)
 	}
 	return tournament.TicketMutation{Ticket: stored.ticket, Changed: changed}, nil
+}
+
+func (store *TicketStore) ExpireTicket(ctx context.Context, command tournament.ExpireTicketCommand) (tournament.TicketMutation, error) {
+	digest, err := command.RequestDigest()
+	if err != nil {
+		return tournament.TicketMutation{}, err
+	}
+	tx, err := store.pool.Begin(ctx)
+	if err != nil {
+		return tournament.TicketMutation{}, fmt.Errorf("begin ticket expiry: %w", err)
+	}
+	defer rollback(tx, ctx)()
+
+	stored, err := loadTicketByID(ctx, tx, command.TicketID, true)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return tournament.TicketMutation{}, tournament.ErrTicketNotFound
+	}
+	if err != nil {
+		return tournament.TicketMutation{}, fmt.Errorf("lock ticket for expiry: %w", err)
+	}
+
+	var storedDigest string
+	err = tx.QueryRow(ctx, `
+SELECT request_digest
+FROM ticket_commands
+WHERE ticket_id = $1 AND command_id = $2`, command.TicketID, command.CommandID).Scan(&storedDigest)
+	if err == nil {
+		if storedDigest != digest {
+			return tournament.TicketMutation{}, tournament.ErrIdempotencyConflict
+		}
+		if err := tx.Commit(ctx); err != nil {
+			return tournament.TicketMutation{}, fmt.Errorf("commit expiry replay: %w", err)
+		}
+		return tournament.TicketMutation{Ticket: stored.ticket, Replay: true}, nil
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return tournament.TicketMutation{}, fmt.Errorf("read expiry command: %w", err)
+	}
+	if stored.ticket.Status != tournament.TicketQueued {
+		return tournament.TicketMutation{}, tournament.ErrTicketNotQueued
+	}
+	claimOwned, err := ownsActiveClaim(ctx, tx, stored, command.ClaimToken)
+	if err != nil {
+		return tournament.TicketMutation{}, fmt.Errorf("verify ticket expiry claim: %w", err)
+	}
+	if !claimOwned {
+		return tournament.TicketMutation{}, tournament.ErrTicketClaimLost
+	}
+
+	stored.ticket.Status = tournament.TicketExpired
+	stored.ticket.ExpiredAt = timePointer(command.ExpiredAt)
+	stored.ticket.AggregateVersion++
+	if _, err := tx.Exec(ctx, `
+UPDATE matchmaking_tickets
+SET status = 'expired', expired_at = $2, aggregate_version = $3,
+    next_attempt_at = NULL, claim_token = NULL, claimed_until = NULL
+WHERE ticket_id = $1`, command.TicketID, command.ExpiredAt, stored.ticket.AggregateVersion); err != nil {
+		return tournament.TicketMutation{}, fmt.Errorf("expire ticket: %w", err)
+	}
+	if _, err := tx.Exec(ctx, `
+INSERT INTO ticket_commands (
+    ticket_id, command_id, command_type, request_digest, resulting_status, occurred_at
+) VALUES ($1, $2, 'expire', $3, 'expired', $4)`,
+		command.TicketID, command.CommandID, digest, command.ExpiredAt,
+	); err != nil {
+		return tournament.TicketMutation{}, mapConflict(err, tournament.ErrIdempotencyConflict, "record expiry command")
+	}
+
+	payload, err := json.Marshal(struct {
+		TicketID  string                  `json:"ticket_id"`
+		Status    tournament.TicketStatus `json:"status"`
+		Deadline  time.Time               `json:"deadline"`
+		ExpiredAt time.Time               `json:"expired_at"`
+	}{
+		TicketID: stored.ticket.ID, Status: stored.ticket.Status,
+		Deadline: command.Deadline, ExpiredAt: command.ExpiredAt,
+	})
+	if err != nil {
+		return tournament.TicketMutation{}, fmt.Errorf("encode ticket expiry event: %w", err)
+	}
+	if err := insertOutbox(ctx, tx, outboxEvent{
+		ID: command.EventID, AggregateType: outboxAggregateTicket, AggregateID: stored.ticket.ID,
+		AggregateVersion: stored.ticket.AggregateVersion, Type: outboxTicketExpired,
+		Payload: string(payload), OccurredAt: command.ExpiredAt,
+	}); err != nil {
+		return tournament.TicketMutation{}, mapConflict(err, tournament.ErrIdempotencyConflict, "insert ticket expiry event")
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return tournament.TicketMutation{}, fmt.Errorf("commit ticket expiry: %w", err)
+	}
+	return tournament.TicketMutation{Ticket: stored.ticket, Changed: true}, nil
 }
 
 func (store *TicketStore) AssignTicket(ctx context.Context, command tournament.AssignTicketCommand) (tournament.Assignment, error) {
@@ -246,6 +339,15 @@ func (store *TicketStore) AssignTicket(ctx context.Context, command tournament.A
 	}
 	if command.AssignedAt.Before(stored.ticket.RequestedAt) {
 		return tournament.Assignment{}, errors.New("assignment cannot precede ticket acceptance")
+	}
+	if command.ClaimToken != "" {
+		claimOwned, err := ownsActiveClaim(ctx, tx, stored, command.ClaimToken)
+		if err != nil {
+			return tournament.Assignment{}, fmt.Errorf("verify ticket assignment claim: %w", err)
+		}
+		if !claimOwned {
+			return tournament.Assignment{}, tournament.ErrTicketClaimLost
+		}
 	}
 
 	room, err := lockAssignmentRoom(ctx, tx, command.RoomID)
@@ -293,7 +395,8 @@ LIMIT 1`, room.id, room.capacity).Scan(&seat); err != nil {
 	stored.ticket.AggregateVersion++
 	if _, err := tx.Exec(ctx, `
 UPDATE matchmaking_tickets
-SET status = 'assigned', assigned_at = $2, aggregate_version = $3
+SET status = 'assigned', assigned_at = $2, aggregate_version = $3,
+    next_attempt_at = NULL, claim_token = NULL, claimed_until = NULL
 WHERE ticket_id = $1`, stored.ticket.ID, command.AssignedAt, stored.ticket.AggregateVersion); err != nil {
 		return tournament.Assignment{}, fmt.Errorf("assign ticket: %w", err)
 	}
@@ -359,6 +462,9 @@ INSERT INTO sessions (
 type storedTicket struct {
 	ticket        tournament.Ticket
 	requestDigest string
+	claimToken    *string
+	claimedUntil  *time.Time
+	attemptCount  int64
 }
 
 func loadTicketByEntry(ctx context.Context, tx pgx.Tx, entryID string, forUpdate bool) (storedTicket, error) {
@@ -382,7 +488,8 @@ SELECT ticket_id, entry_id, player_id, tournament_id, tournament_version,
        status, requested_at, assigned_at, cancelled_at, expired_at,
        snapshot_at, rating_mean, rating_uncertainty,
        rating_performance_deviation, rating_games, rating_model_version,
-       rating_updated_at, aggregate_version, request_digest
+       rating_updated_at, aggregate_version, request_digest,
+       claim_token, claimed_until, attempt_count
 FROM matchmaking_tickets`
 
 type rowScanner interface {
@@ -401,6 +508,7 @@ func scanStoredTicket(row rowScanner) (storedTicket, error) {
 		&result.ticket.RatingSnapshot.PerformanceDeviation, &result.ticket.RatingSnapshot.Games,
 		&result.ticket.RatingSnapshot.ModelVersion, &result.ticket.RatingSnapshot.UpdatedAt,
 		&result.ticket.AggregateVersion, &result.requestDigest,
+		&result.claimToken, &result.claimedUntil, &result.attemptCount,
 	)
 	if err != nil {
 		return storedTicket{}, err
@@ -534,6 +642,17 @@ func rollback(tx pgx.Tx, ctx context.Context) func() {
 
 func timePointer(value time.Time) *time.Time {
 	return &value
+}
+
+func ownsActiveClaim(ctx context.Context, tx pgx.Tx, stored storedTicket, claimToken string) (bool, error) {
+	if stored.claimToken == nil || *stored.claimToken != claimToken || stored.claimedUntil == nil {
+		return false, nil
+	}
+	var active bool
+	if err := tx.QueryRow(ctx, "SELECT $1::timestamptz > clock_timestamp()", *stored.claimedUntil).Scan(&active); err != nil {
+		return false, err
+	}
+	return active, nil
 }
 
 func mapConflict(err error, conflict error, operation string) error {
