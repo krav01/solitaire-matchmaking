@@ -14,6 +14,7 @@ import (
 
 var (
 	ErrIdempotencyConflict = errors.New("idempotency identity was reused with different input")
+	ErrTournamentNotFound  = errors.New("tournament configuration not found")
 	ErrTicketNotFound      = errors.New("ticket not found")
 	ErrTicketNotQueued     = errors.New("ticket is not queued")
 	ErrRoomNotAvailable    = errors.New("room is not available for assignment")
@@ -197,6 +198,13 @@ type TicketMutation struct {
 	Replay  bool
 }
 
+// TicketState is the externally observable ticket lifecycle. Assignment is
+// present only after the matchmaking transaction allocates a session.
+type TicketState struct {
+	Ticket     Ticket
+	Assignment *Assignment
+}
+
 type Assignment struct {
 	AssignmentID   string
 	TicketID       string
@@ -216,6 +224,7 @@ type Assignment struct {
 type TicketLifecycleRepository interface {
 	AcceptTicket(context.Context, AcceptTicketCommand) (TicketMutation, error)
 	CancelTicket(context.Context, CancelTicketCommand) (TicketMutation, error)
+	GetTicket(context.Context, string) (TicketState, error)
 	AssignTicket(context.Context, AssignTicketCommand) (Assignment, error)
 	ExpireTicket(context.Context, ExpireTicketCommand) (TicketMutation, error)
 }
@@ -243,6 +252,14 @@ func (service *TicketService) Cancel(ctx context.Context, command CancelTicketCo
 		return TicketMutation{}, err
 	}
 	return service.repository.CancelTicket(ctx, command)
+}
+
+func (service *TicketService) Get(ctx context.Context, ticketID string) (TicketState, error) {
+	if ticketID == "" {
+		return TicketState{}, errors.New("ticket identity is required")
+	}
+
+	return service.repository.GetTicket(ctx, ticketID)
 }
 
 func (service *TicketService) Assign(ctx context.Context, command AssignTicketCommand) (Assignment, error) {

@@ -27,6 +27,12 @@ type ResultFinalizer interface {
 	Finalize(context.Context, tournament.FinalizeResultCommand) (tournament.FinalizedResult, error)
 }
 
+type TicketManager interface {
+	Accept(context.Context, tournament.AcceptTicketCommand) (tournament.TicketMutation, error)
+	Cancel(context.Context, tournament.CancelTicketCommand) (tournament.TicketMutation, error)
+	Get(context.Context, string) (tournament.TicketState, error)
+}
+
 type Options struct {
 	APIToken         string
 	ReadinessTimeout time.Duration
@@ -40,9 +46,9 @@ type Server struct {
 	draining atomic.Bool
 }
 
-func New(check Readiness, results ResultFinalizer, logger *slog.Logger, opts Options) (*Server, error) {
-	if check == nil || results == nil || logger == nil {
-		return nil, errors.New("readiness checker, result finalizer and logger are required")
+func New(check Readiness, tickets TicketManager, results ResultFinalizer, logger *slog.Logger, opts Options) (*Server, error) {
+	if check == nil || tickets == nil || results == nil || logger == nil {
+		return nil, errors.New("readiness checker, ticket manager, result finalizer and logger are required")
 	}
 	if len(opts.APIToken) < 32 || opts.ReadinessTimeout <= 0 || opts.ReadinessTimeout > 5*time.Second || opts.ShutdownTimeout <= 0 {
 		return nil, errors.New("invalid HTTP server options")
@@ -72,11 +78,13 @@ func New(check Readiness, results ResultFinalizer, logger *slog.Logger, opts Opt
 		}
 		s.respond(w, r, http.StatusOK, map[string]any{
 			"service": "solitaire-matchmaking", "stage": "transactional_event_delivery",
-			"rating_enabled": true, "matchmaking_enabled": true, "result_ingestion_enabled": true,
-			"outbox_delivery_enabled": true,
-			"planned_room_sizes":      []int{5, 6, 7},
+			"rating_enabled": true, "matchmaking_enabled": true, "ticket_lifecycle_enabled": true,
+			"result_ingestion_enabled": true,
+			"outbox_delivery_enabled":  true,
+			"planned_room_sizes":       []int{5, 6, 7},
 		})
 	})
+	s.registerTicketRoutes(mux, tickets, expectedToken)
 	s.registerResultRoutes(mux, results, expectedToken)
 	s.http = &http.Server{
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

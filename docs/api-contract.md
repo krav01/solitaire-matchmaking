@@ -11,7 +11,38 @@ The implemented inbound API and outbound webhook envelope are defined in
 | GET /healthz | None | Process liveness |
 | GET /readyz | None | PostgreSQL readiness and draining state |
 | GET /v1/capabilities | API_TOKEN bearer | Current service capabilities |
+| POST /v1/tickets | API_TOKEN bearer | Accept an eligible reserved entry and rating snapshot |
+| GET /v1/tickets/{ticket_id} | API_TOKEN bearer | Read queue or assignment state |
+| DELETE /v1/tickets/{ticket_id} | API_TOKEN bearer | Cancel an eligible queued entry |
 | POST /v1/results | API_TOKEN bearer | Complete, server-verified room result |
+
+Ticket acceptance uses `entry_id` as its idempotency identity. The game backend
+must persist the request, including `requested_at` and the pre-game rating
+snapshot, before sending it. The initial request returns 201; an identical retry
+returns 200 with the original `ticket_id` and `replay: true`. A different request
+with the same entry identity returns `idempotency_conflict`.
+
+The rating snapshot must have been available by `snapshot_at`, and `snapshot_at`
+must not follow `requested_at`. Matching reads this immutable snapshot and never
+uses a result from the room currently being formed. A queued ticket response has
+no `assignment`. Once assigned, GET returns `room_id`, `session_id`, seat and
+aggregate versions. Polling reads indexed identities and does not block the
+matchmaking worker.
+
+Cancellation requires a stable `Idempotency-Key` header. Reuse it after a timeout
+or 5xx response. A queued ticket transitions to cancelled; an identical command
+returns the stored decision. Assigned and expired tickets return
+`ticket_not_queued` and remain unchanged.
+
+| HTTP status | Ticket error code | Caller action |
+| --- | --- | --- |
+| 400 | invalid_ticket | Correct malformed, oversized, unknown-field or invalid data |
+| 400 | invalid_cancellation | Supply a stable cancellation Idempotency-Key |
+| 404 | tournament_not_found | Reconcile tournament identity and version |
+| 404 | ticket_not_found | Reconcile the ticket identity |
+| 409 | idempotency_conflict | Reconcile reused entry or cancellation identity |
+| 409 | ticket_not_queued | Stop cancellation and read current state |
+| 500 | internal_error | Retry persisted input with bounded backoff |
 
 Results use the body field `event_id` as their idempotency identity, not an
 Idempotency-Key header. Persist the request before sending it and reuse that
@@ -88,15 +119,12 @@ the game backend.
 
 ## Planned HTTP surface
 
-Ticket use cases exist internally, but these HTTP routes are not registered:
+These read adapters are not registered yet:
 
 | Endpoint | Intended purpose |
 | --- | --- |
-| POST /v1/tickets | Accept an eligible reserved entry and rating snapshot |
-| DELETE /v1/tickets/{ticket_id} | Cancel an eligible queued entry |
-| GET /v1/tickets/{ticket_id} | Read queue or assignment state |
 | GET /v1/rooms/{room_id} | Read composition and lifecycle state |
 | GET /v1/ratings/{player_id}?mode_id=... | Read a versioned rating |
 
-The receiver example and result endpoint alone do not constitute a complete
-external onboarding path. Ticket/query HTTP adapters remain integration work.
+The ticket endpoints and assignment events provide the external onboarding path.
+Room and rating queries remain integration work for diagnostics and reconciliation.

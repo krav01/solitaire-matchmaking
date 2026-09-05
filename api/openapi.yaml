@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Solitaire Matchmaking API
-  version: 0.4.0
+  version: 0.5.0
   description: |
     Implemented HTTP endpoints and the outbound game-backend event contract.
     Every HTTP response includes `X-Request-ID`, `Cache-Control: no-store` and
@@ -77,11 +77,166 @@ paths:
                 stage: transactional_event_delivery
                 rating_enabled: true
                 matchmaking_enabled: true
+                ticket_lifecycle_enabled: true
                 result_ingestion_enabled: true
                 outbox_delivery_enabled: true
                 planned_room_sizes: [5, 6, 7]
         "401":
           $ref: "#/components/responses/Unauthorized"
+  /v1/tickets:
+    post:
+      tags: [Integration]
+      summary: Accept an eligible tournament entry
+      operationId: acceptTicket
+      description: |
+        Records a game-backend-authorized entry and its immutable pre-game
+        rating snapshot. `entry_id` is the idempotency identity. An identical
+        retry returns the stored ticket; reusing the entry identity with
+        different logical data returns a conflict. The body is limited to
+        1 MiB and unknown fields are rejected.
+      security:
+        - apiBearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AcceptTicketRequest"
+            example:
+              entry_id: entry-01K4E7JY7E0WRF6S8P7NVE7YBV
+              player_id: player-01
+              tournament_id: daily-ranked
+              tournament_version: v1
+              requested_at: "2026-09-05T10:00:00Z"
+              snapshot_at: "2026-09-05T10:00:00Z"
+              rating_snapshot:
+                mean: 25
+                uncertainty: 8
+                games: 12
+                model_version: baseline-v1
+                updated_at: "2026-09-05T09:59:00Z"
+      responses:
+        "201":
+          description: Entry accepted as a new queued ticket.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TicketMutation"
+        "200":
+          description: Identical retry returned the stored ticket.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TicketMutation"
+        "400":
+          description: Malformed or invalid ticket data.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example: {error: invalid_ticket}
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Referenced tournament configuration does not exist.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example: {error: tournament_not_found}
+        "409":
+          description: Entry identity was reused with different data.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example: {error: idempotency_conflict}
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /v1/tickets/{ticket_id}:
+    parameters:
+      - name: ticket_id
+        in: path
+        required: true
+        schema:
+          type: string
+          minLength: 1
+    get:
+      tags: [Integration]
+      summary: Read ticket and assignment state
+      operationId: getTicket
+      security:
+        - apiBearerAuth: []
+      responses:
+        "200":
+          description: Current ticket state and its assignment when available.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TicketState"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Ticket does not exist.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example: {error: ticket_not_found}
+        "500":
+          $ref: "#/components/responses/InternalError"
+    delete:
+      tags: [Integration]
+      summary: Cancel a queued ticket
+      operationId: cancelTicket
+      description: |
+        Cancels a ticket that has not been assigned or expired. The caller must
+        persist and reuse `Idempotency-Key` for retries of the same cancellation.
+      security:
+        - apiBearerAuth: []
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+            minLength: 1
+      responses:
+        "200":
+          description: Cancellation applied, already observed, or identically replayed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TicketMutation"
+        "400":
+          description: Cancellation identity is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example: {error: invalid_cancellation}
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Ticket does not exist.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example: {error: ticket_not_found}
+        "409":
+          description: Command identity conflict or ticket is already assigned or expired.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              examples:
+                identity:
+                  value: {error: idempotency_conflict}
+                state:
+                  value: {error: ticket_not_queued}
+        "500":
+          $ref: "#/components/responses/InternalError"
   /v1/results:
     post:
       tags: [Integration]
@@ -278,6 +433,16 @@ components:
           schema:
             $ref: "#/components/schemas/Error"
           example: {error: unauthorized}
+    InternalError:
+      description: Operation failed unexpectedly.
+      headers:
+        X-Request-ID:
+          $ref: "#/components/headers/RequestID"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example: {error: internal_error}
   schemas:
     Status:
       type: object
@@ -290,7 +455,7 @@ components:
     Capabilities:
       type: object
       additionalProperties: false
-      required: [service, stage, rating_enabled, matchmaking_enabled, result_ingestion_enabled, outbox_delivery_enabled, planned_room_sizes]
+      required: [service, stage, rating_enabled, matchmaking_enabled, ticket_lifecycle_enabled, result_ingestion_enabled, outbox_delivery_enabled, planned_room_sizes]
       properties:
         service:
           type: string
@@ -302,6 +467,9 @@ components:
           type: boolean
           const: true
         matchmaking_enabled:
+          type: boolean
+          const: true
+        ticket_lifecycle_enabled:
           type: boolean
           const: true
         result_ingestion_enabled:
@@ -324,7 +492,159 @@ components:
       properties:
         error:
           type: string
-          enum: [unauthorized, invalid_result, room_not_found, result_conflict, room_not_collecting, result_deadline_passed, participants_mismatch, internal_error]
+          enum: [unauthorized, invalid_ticket, invalid_cancellation, tournament_not_found, ticket_not_found, idempotency_conflict, ticket_not_queued, invalid_result, room_not_found, result_conflict, room_not_collecting, result_deadline_passed, participants_mismatch, internal_error]
+    RatingEstimate:
+      type: object
+      additionalProperties: false
+      required: [mean, uncertainty, games, model_version, updated_at]
+      properties:
+        mean:
+          type: number
+          format: double
+        uncertainty:
+          type: number
+          format: double
+          exclusiveMinimum: 0
+        performance_deviation:
+          type: number
+          format: double
+          minimum: 0
+        games:
+          type: integer
+          format: int64
+          minimum: 0
+        model_version:
+          type: string
+          minLength: 1
+        updated_at:
+          type: string
+          format: date-time
+    AcceptTicketRequest:
+      type: object
+      additionalProperties: false
+      required: [entry_id, player_id, tournament_id, tournament_version, requested_at, snapshot_at, rating_snapshot]
+      properties:
+        entry_id:
+          type: string
+          minLength: 1
+          description: Stable game-backend entry and request idempotency identity.
+        player_id:
+          type: string
+          minLength: 1
+        tournament_id:
+          type: string
+          minLength: 1
+        tournament_version:
+          type: string
+          minLength: 1
+        requested_at:
+          type: string
+          format: date-time
+          description: Stable entry time used for queue age and identical retries.
+        snapshot_at:
+          type: string
+          format: date-time
+          description: Must not be later than `requested_at`.
+        rating_snapshot:
+          $ref: "#/components/schemas/RatingEstimate"
+    Ticket:
+      type: object
+      additionalProperties: false
+      required: [ticket_id, entry_id, player_id, tournament_id, tournament_version, status, requested_at, snapshot_at, rating_snapshot, aggregate_version]
+      properties:
+        ticket_id:
+          type: string
+          minLength: 1
+        entry_id:
+          type: string
+          minLength: 1
+        player_id:
+          type: string
+          minLength: 1
+        tournament_id:
+          type: string
+          minLength: 1
+        tournament_version:
+          type: string
+          minLength: 1
+        status:
+          type: string
+          enum: [queued, assigned, cancelled, expired]
+        requested_at:
+          type: string
+          format: date-time
+        assigned_at:
+          type: string
+          format: date-time
+        cancelled_at:
+          type: string
+          format: date-time
+        expired_at:
+          type: string
+          format: date-time
+        snapshot_at:
+          type: string
+          format: date-time
+        rating_snapshot:
+          $ref: "#/components/schemas/RatingEstimate"
+        aggregate_version:
+          type: integer
+          format: int64
+          minimum: 1
+    TicketMutation:
+      type: object
+      additionalProperties: false
+      required: [ticket, changed, replay]
+      properties:
+        ticket:
+          $ref: "#/components/schemas/Ticket"
+        changed:
+          type: boolean
+        replay:
+          type: boolean
+    Assignment:
+      type: object
+      additionalProperties: false
+      required: [assignment_id, room_id, session_id, seat, assigned_at, ticket_version, room_version, room_filled]
+      properties:
+        assignment_id:
+          type: string
+          minLength: 1
+        room_id:
+          type: string
+          minLength: 1
+        session_id:
+          type: string
+          minLength: 1
+        seat:
+          type: integer
+          minimum: 1
+          maximum: 7
+        assigned_at:
+          type: string
+          format: date-time
+        ticket_version:
+          type: integer
+          format: int64
+          minimum: 1
+        room_version:
+          type: integer
+          format: int64
+          minimum: 1
+        room_filled:
+          type: boolean
+        result_deadline:
+          type: string
+          format: date-time
+    TicketState:
+      type: object
+      additionalProperties: false
+      required: [ticket]
+      properties:
+        ticket:
+          $ref: "#/components/schemas/Ticket"
+        assignment:
+          $ref: "#/components/schemas/Assignment"
     FinalizeResultRequest:
       type: object
       additionalProperties: false

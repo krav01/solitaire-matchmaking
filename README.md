@@ -28,6 +28,8 @@ correlation guards, training-only standardization and time-ordered holdout
 calibration. Paired segment comparisons and revision-fenced activation with
 one-step rollback complete the Stage 5 governance boundary; the placement-only
 baseline remains active until a candidate passes real-data thresholds.
+Authenticated ticket endpoints now accept idempotent entries, cancel queued
+tickets and expose assignment state for game-backend polling.
 
 ## Architecture
 
@@ -95,7 +97,7 @@ curl -H "Authorization: Bearer $API_TOKEN" \
   http://127.0.0.1:8080/v1/capabilities
 ```
 
-The verified-result request and response schemas are documented in
+Ticket lifecycle and verified-result request/response schemas are documented in
 [`api/openapi.yaml`](api/openapi.yaml). Identical retries return the stored result;
 late, partial or identity-conflicting results are rejected.
 

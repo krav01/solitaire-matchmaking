@@ -50,11 +50,19 @@ func TestTicketLifecyclePostgreSQL(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewTicketService() error = %v", err)
 	}
+	missingTournament := lifecycleAcceptCommand(prefix+"-missing-tournament", prefix+"-unknown", tournamentVersion, modelVersion, startedAt)
+	if _, err := service.Accept(ctx, missingTournament); !errors.Is(err, tournament.ErrTournamentNotFound) {
+		t.Fatalf("Accept(missing tournament) error = %v", err)
+	}
 
 	cancelCommand := lifecycleAcceptCommand(prefix+"-cancel", tournamentID, tournamentVersion, modelVersion, startedAt)
 	accepted, err := service.Accept(ctx, cancelCommand)
 	if err != nil || !accepted.Changed || accepted.Replay {
 		t.Fatalf("first Accept() = %+v, error = %v", accepted, err)
+	}
+	queuedState, err := service.Get(ctx, accepted.Ticket.ID)
+	if err != nil || queuedState.Ticket.Status != tournament.TicketQueued || queuedState.Assignment != nil {
+		t.Fatalf("queued Get() = %+v, error = %v", queuedState, err)
 	}
 	retry := cancelCommand
 	retry.Ticket.ID = prefix + "-ignored-ticket-id"
@@ -159,6 +167,15 @@ func TestTicketLifecyclePostgreSQL(t *testing.T) {
 	}
 	if successes != 1 || rejections != 1 {
 		t.Fatalf("concurrent assignments: successes = %d, rejections = %d", successes, rejections)
+	}
+	assignedState, err := service.Get(ctx, successful.command.TicketID)
+	if err != nil || assignedState.Ticket.Status != tournament.TicketAssigned || assignedState.Assignment == nil ||
+		assignedState.Assignment.AssignmentID != successful.assignment.AssignmentID ||
+		assignedState.Assignment.SessionID != successful.assignment.SessionID {
+		t.Fatalf("assigned Get() = %+v, error = %v", assignedState, err)
+	}
+	if _, err := service.Get(ctx, prefix+"-missing-ticket"); !errors.Is(err, tournament.ErrTicketNotFound) {
+		t.Fatalf("missing Get() error = %v", err)
 	}
 
 	retryAssignment := successful.command

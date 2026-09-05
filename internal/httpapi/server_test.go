@@ -83,14 +83,16 @@ func TestServerCapabilitiesRequireAuthentication(t *testing.T) {
 			}
 			if tt.want == http.StatusOK {
 				var body struct {
-					Stage                 string `json:"stage"`
-					RatingEnabled         bool   `json:"rating_enabled"`
-					OutboxDeliveryEnabled bool   `json:"outbox_delivery_enabled"`
+					Stage                  string `json:"stage"`
+					RatingEnabled          bool   `json:"rating_enabled"`
+					TicketLifecycleEnabled bool   `json:"ticket_lifecycle_enabled"`
+					OutboxDeliveryEnabled  bool   `json:"outbox_delivery_enabled"`
 				}
 				if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
 					t.Fatalf("decode capabilities: %v", err)
 				}
-				if body.Stage != "transactional_event_delivery" || !body.RatingEnabled || !body.OutboxDeliveryEnabled {
+				if body.Stage != "transactional_event_delivery" || !body.RatingEnabled ||
+					!body.TicketLifecycleEnabled || !body.OutboxDeliveryEnabled {
 					t.Fatalf("capabilities = %+v", body)
 				}
 			}
@@ -156,11 +158,49 @@ func newServer(t *testing.T, check httpapi.Readiness) *httpapi.Server {
 
 func newServerWithResults(t *testing.T, check httpapi.Readiness, results httpapi.ResultFinalizer) *httpapi.Server {
 	t.Helper()
-	server, err := httpapi.New(check, results, slog.New(slog.NewTextHandler(io.Discard, nil)), httpapi.Options{
+	return newServerWithTicketsAndResults(t, check, &ticketManagerStub{}, results)
+}
+
+func newServerWithTickets(t *testing.T, tickets httpapi.TicketManager) *httpapi.Server {
+	t.Helper()
+	return newServerWithTicketsAndResults(t, readinessStub{}, tickets, &resultFinalizerStub{})
+}
+
+func newServerWithTicketsAndResults(t *testing.T, check httpapi.Readiness, tickets httpapi.TicketManager, results httpapi.ResultFinalizer) *httpapi.Server {
+	t.Helper()
+	server, err := httpapi.New(check, tickets, results, slog.New(slog.NewTextHandler(io.Discard, nil)), httpapi.Options{
 		APIToken: testToken, ReadinessTimeout: time.Second, ShutdownTimeout: time.Second,
 	})
 	if err != nil {
 		t.Fatalf("New() error: %v", err)
 	}
 	return server
+}
+
+type ticketManagerStub struct {
+	acceptResult tournament.TicketMutation
+	acceptErr    error
+	cancelResult tournament.TicketMutation
+	cancelErr    error
+	state        tournament.TicketState
+	getErr       error
+
+	accepted  tournament.AcceptTicketCommand
+	cancelled tournament.CancelTicketCommand
+	got       string
+}
+
+func (manager *ticketManagerStub) Accept(_ context.Context, command tournament.AcceptTicketCommand) (tournament.TicketMutation, error) {
+	manager.accepted = command
+	return manager.acceptResult, manager.acceptErr
+}
+
+func (manager *ticketManagerStub) Cancel(_ context.Context, command tournament.CancelTicketCommand) (tournament.TicketMutation, error) {
+	manager.cancelled = command
+	return manager.cancelResult, manager.cancelErr
+}
+
+func (manager *ticketManagerStub) Get(_ context.Context, ticketID string) (tournament.TicketState, error) {
+	manager.got = ticketID
+	return manager.state, manager.getErr
 }
