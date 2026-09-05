@@ -2,6 +2,7 @@ package rating_test
 
 import (
 	"math"
+	"strings"
 	"testing"
 	"time"
 
@@ -114,6 +115,114 @@ func TestEvaluateCalibrationRejectsLeakageAndMixedSegments(t *testing.T) {
 			t.Parallel()
 			if _, err := rating.EvaluateCalibration(test.observations, 10); err == nil {
 				t.Fatal("EvaluateCalibration() error = nil, want error")
+			}
+		})
+	}
+}
+
+func TestEvaluateHoldoutCalibrationRecordsTrainingBoundary(t *testing.T) {
+	t.Parallel()
+
+	model := newBaseline(t)
+	result, estimates, _ := orderedResult(t, model, 5)
+	prediction, err := model.Predict(predictionRequest(result, estimates))
+	if err != nil {
+		t.Fatalf("Predict() error = %v", err)
+	}
+	cutoff := result.AvailableAt.Add(-time.Hour)
+	trainedThrough := cutoff.Add(-time.Minute)
+
+	report, err := rating.EvaluateHoldoutCalibration(
+		[]rating.CalibrationObservation{{Prediction: prediction, Result: result}},
+		rating.HoldoutCalibrationConfig{
+			TrainingCutoff:      cutoff,
+			ModelTrainedThrough: trainedThrough,
+			BinCount:            10,
+		},
+	)
+	if err != nil {
+		t.Fatalf("EvaluateHoldoutCalibration() error = %v", err)
+	}
+	if report.TrainingCutoff != cutoff || report.ModelTrainedThrough != trainedThrough || report.Calibration.Rooms != 1 {
+		t.Fatalf("holdout report = %+v", report)
+	}
+}
+
+func TestEvaluateHoldoutCalibrationRejectsLeakage(t *testing.T) {
+	t.Parallel()
+
+	model := newBaseline(t)
+	result, estimates, _ := orderedResult(t, model, 5)
+	prediction, err := model.Predict(predictionRequest(result, estimates))
+	if err != nil {
+		t.Fatalf("Predict() error = %v", err)
+	}
+	cutoff := result.AvailableAt.Add(-time.Hour)
+	observation := rating.CalibrationObservation{Prediction: prediction, Result: result}
+
+	tests := []struct {
+		name        string
+		observation rating.CalibrationObservation
+		config      rating.HoldoutCalibrationConfig
+		wantError   string
+	}{
+		{
+			name:        "model trained after cutoff",
+			observation: observation,
+			config: rating.HoldoutCalibrationConfig{
+				TrainingCutoff:      cutoff,
+				ModelTrainedThrough: cutoff.Add(time.Nanosecond),
+				BinCount:            10,
+			},
+			wantError: "trained beyond",
+		},
+		{
+			name: "result available by cutoff",
+			observation: func() rating.CalibrationObservation {
+				value := observation
+				value.Result.AvailableAt = cutoff
+				value.Result.FinishedAt = cutoff
+				return value
+			}(),
+			config: rating.HoldoutCalibrationConfig{
+				TrainingCutoff:      cutoff,
+				ModelTrainedThrough: cutoff,
+				BinCount:            10,
+			},
+			wantError: "available by",
+		},
+		{
+			name:        "missing cutoff",
+			observation: observation,
+			config: rating.HoldoutCalibrationConfig{
+				ModelTrainedThrough: cutoff,
+				BinCount:            10,
+			},
+			wantError: "cutoff",
+		},
+		{
+			name: "prediction before model training horizon",
+			observation: func() rating.CalibrationObservation {
+				value := observation
+				value.Prediction.GeneratedAt = cutoff.Add(-time.Nanosecond)
+				return value
+			}(),
+			config: rating.HoldoutCalibrationConfig{
+				TrainingCutoff:      cutoff,
+				ModelTrainedThrough: cutoff,
+				BinCount:            10,
+			},
+			wantError: "predates",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			_, err := rating.EvaluateHoldoutCalibration([]rating.CalibrationObservation{tt.observation}, tt.config)
+			if err == nil || !strings.Contains(err.Error(), tt.wantError) {
+				t.Fatalf("EvaluateHoldoutCalibration() error = %v, want containing %q", err, tt.wantError)
 			}
 		})
 	}
