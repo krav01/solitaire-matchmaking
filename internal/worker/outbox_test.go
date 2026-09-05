@@ -22,9 +22,11 @@ func TestOutboxRunnerBoundsConcurrencyAndRetriesFailures(t *testing.T) {
 	publisher := &blockingPublisher{
 		started: make(chan struct{}, 5), release: make(chan struct{}), failEvent: "a",
 	}
+	observer := &workerObserverStub{}
 	runner, err := NewOutboxRunner(queue, publisher, slog.New(slog.NewTextHandler(io.Discard, nil)), OutboxRunnerOptions{
 		BatchSize: 5, Concurrency: 2, LeaseDuration: time.Minute,
 		PollInterval: time.Second, RetryBaseDelay: time.Second, RetryMaxDelay: 8 * time.Second,
+		Observer: observer,
 	})
 	if err != nil {
 		t.Fatalf("NewOutboxRunner() error = %v", err)
@@ -55,6 +57,11 @@ func TestOutboxRunnerBoundsConcurrencyAndRetriesFailures(t *testing.T) {
 	}
 	if queue.retryEvent != "a" || !queue.retryAt.Equal(now.Add(time.Second)) || len(queue.delivered) != 4 {
 		t.Fatalf("queue retry = %q at %v, delivered = %v", queue.retryEvent, queue.retryAt, queue.delivered)
+	}
+	if observer.observation != (WorkerCycleObservation{
+		Worker: WorkerOutbox, Claimed: 5, Succeeded: 4, Failed: 1, Errored: true,
+	}) {
+		t.Fatalf("worker observation = %+v", observer.observation)
 	}
 }
 

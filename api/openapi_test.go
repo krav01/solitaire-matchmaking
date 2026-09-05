@@ -26,6 +26,7 @@ func TestOpenAPIContractParsesAndResolvesLocalReferences(t *testing.T) {
 	for path, methods := range map[string][]string{
 		"/healthz":                {"get"},
 		"/readyz":                 {"get"},
+		"/metrics":                {"get"},
 		"/v1/capabilities":        {"get"},
 		"/v1/tickets":             {"post"},
 		"/v1/tickets/{ticket_id}": {"get", "delete"},

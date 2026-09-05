@@ -10,6 +10,7 @@ The implemented inbound API and outbound webhook envelope are defined in
 | --- | --- | --- |
 | GET /healthz | None | Process liveness |
 | GET /readyz | None | PostgreSQL readiness and draining state |
+| GET /metrics | API_TOKEN bearer | Prometheus/OpenMetrics operational telemetry |
 | GET /v1/capabilities | API_TOKEN bearer | Current service capabilities |
 | POST /v1/tickets | API_TOKEN bearer | Accept an eligible reserved entry and rating snapshot |
 | GET /v1/tickets/{ticket_id} | API_TOKEN bearer | Read queue or assignment state |

@@ -95,6 +95,7 @@ type OutboxRunnerOptions struct {
 	PollInterval   time.Duration
 	RetryBaseDelay time.Duration
 	RetryMaxDelay  time.Duration
+	Observer       WorkerObserver
 }
 
 func (options OutboxRunnerOptions) Validate() error {
@@ -128,6 +129,7 @@ type OutboxRunner struct {
 	publisher OutboxPublisher
 	logger    *slog.Logger
 	options   OutboxRunnerOptions
+	observer  WorkerObserver
 	now       func() time.Time
 	token     func() string
 }
@@ -142,7 +144,7 @@ func NewOutboxRunner(queue OutboxQueue, publisher OutboxPublisher, logger *slog.
 
 	return &OutboxRunner{
 		queue: queue, publisher: publisher, logger: logger, options: options,
-		now: time.Now, token: rand.Text,
+		observer: configuredWorkerObserver(options.Observer), now: time.Now, token: rand.Text,
 	}, nil
 }
 
@@ -164,7 +166,15 @@ func (runner *OutboxRunner) Run(ctx context.Context) {
 	}
 }
 
-func (runner *OutboxRunner) RunOnce(ctx context.Context) (OutboxRunResult, error) {
+func (runner *OutboxRunner) RunOnce(ctx context.Context) (result OutboxRunResult, runErr error) {
+	defer func() {
+		runner.observer.ObserveWorkerCycle(WorkerCycleObservation{
+			Worker: WorkerOutbox, Claimed: result.Claimed,
+			Succeeded: result.Delivered, Failed: result.Failed,
+			Errored: runErr != nil,
+		})
+	}()
+
 	claimedAt := runner.now().UTC()
 	claims, err := runner.queue.ClaimOutboxEvents(ctx, OutboxClaimRequest{
 		Token: runner.token(), Limit: runner.options.BatchSize,
@@ -174,7 +184,7 @@ func (runner *OutboxRunner) RunOnce(ctx context.Context) (OutboxRunResult, error
 		return OutboxRunResult{}, fmt.Errorf("claim outbox events: %w", err)
 	}
 
-	result := OutboxRunResult{Claimed: len(claims)}
+	result = OutboxRunResult{Claimed: len(claims)}
 	if len(claims) == 0 {
 		return result, nil
 	}

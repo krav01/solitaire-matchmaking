@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -87,16 +88,45 @@ func TestServerCapabilitiesRequireAuthentication(t *testing.T) {
 					RatingEnabled          bool   `json:"rating_enabled"`
 					TicketLifecycleEnabled bool   `json:"ticket_lifecycle_enabled"`
 					OutboxDeliveryEnabled  bool   `json:"outbox_delivery_enabled"`
+					MetricsEnabled         bool   `json:"metrics_enabled"`
 				}
 				if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
 					t.Fatalf("decode capabilities: %v", err)
 				}
-				if body.Stage != "transactional_event_delivery" || !body.RatingEnabled ||
-					!body.TicketLifecycleEnabled || !body.OutboxDeliveryEnabled {
+				if body.Stage != "operational_observability" || !body.RatingEnabled ||
+					!body.TicketLifecycleEnabled || !body.OutboxDeliveryEnabled || !body.MetricsEnabled {
 					t.Fatalf("capabilities = %+v", body)
 				}
 			}
 		})
+	}
+}
+
+func TestServerExposesAuthenticatedMetricsAndRecordsRequest(t *testing.T) {
+	t.Parallel()
+
+	metrics := &metricsStub{handler: http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/plain")
+		_, _ = w.Write([]byte("service_metric 1\n"))
+	})}
+	server, err := httpapi.New(
+		readinessStub{}, &ticketManagerStub{}, &resultFinalizerStub{}, &queryReaderStub{},
+		slog.New(slog.NewTextHandler(io.Discard, nil)), httpapi.Options{
+			APIToken: testToken, ReadinessTimeout: time.Second,
+			ShutdownTimeout: time.Second, Metrics: metrics,
+		},
+	)
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+
+	response := serveAuthenticated(server.Handler(), http.MethodGet, "/metrics", "", "")
+	if response.Code != http.StatusOK || response.Body.String() != "service_metric 1\n" {
+		t.Fatalf("metrics response = %d %q", response.Code, response.Body.String())
+	}
+	if metrics.method != http.MethodGet || metrics.route != "/metrics" ||
+		metrics.status != http.StatusOK || metrics.duration <= 0 {
+		t.Fatalf("HTTP observation = %+v", metrics)
 	}
 }
 
@@ -180,11 +210,37 @@ func newServerWithDependencies(t *testing.T, check httpapi.Readiness, tickets ht
 	t.Helper()
 	server, err := httpapi.New(check, tickets, results, queries, slog.New(slog.NewTextHandler(io.Discard, nil)), httpapi.Options{
 		APIToken: testToken, ReadinessTimeout: time.Second, ShutdownTimeout: time.Second,
+		Metrics: &metricsStub{handler: http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		})},
 	})
 	if err != nil {
 		t.Fatalf("New() error: %v", err)
 	}
 	return server
+}
+
+type metricsStub struct {
+	mu       sync.Mutex
+	handler  http.Handler
+	method   string
+	route    string
+	status   int
+	duration time.Duration
+}
+
+func (metrics *metricsStub) Handler() http.Handler {
+	return metrics.handler
+}
+
+func (metrics *metricsStub) ObserveHTTPRequest(method, route string, status int, duration time.Duration) {
+	metrics.mu.Lock()
+	defer metrics.mu.Unlock()
+
+	metrics.method = method
+	metrics.route = route
+	metrics.status = status
+	metrics.duration = duration
 }
 
 type queryReaderStub struct {

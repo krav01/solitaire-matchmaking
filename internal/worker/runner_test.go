@@ -23,9 +23,10 @@ func TestRunnerBoundsConcurrencyAndReleasesFailedClaims(t *testing.T) {
 		}
 	}
 	handler := &blockingHandler{started: make(chan struct{}, 5), release: make(chan struct{}), failTicket: "a"}
+	observer := &workerObserverStub{}
 	runner, err := NewRunner(queue, handler, slog.New(slog.NewTextHandler(io.Discard, nil)), RunnerOptions{
 		BatchSize: 5, Concurrency: 2, LeaseDuration: time.Minute,
-		PollInterval: time.Second, FailureBackoff: time.Second,
+		PollInterval: time.Second, FailureBackoff: time.Second, Observer: observer,
 	})
 	if err != nil {
 		t.Fatalf("NewRunner() error = %v", err)
@@ -56,6 +57,19 @@ func TestRunnerBoundsConcurrencyAndReleasesFailedClaims(t *testing.T) {
 	if queue.retryTicket != "a" || !queue.retryAt.Equal(now.Add(time.Second)) {
 		t.Fatalf("failed retry = %q at %v", queue.retryTicket, queue.retryAt)
 	}
+	if observer.observation != (WorkerCycleObservation{
+		Worker: WorkerMatchmaking, Claimed: 5, Succeeded: 4, Failed: 1, Errored: true,
+	}) {
+		t.Fatalf("worker observation = %+v", observer.observation)
+	}
+}
+
+type workerObserverStub struct {
+	observation WorkerCycleObservation
+}
+
+func (observer *workerObserverStub) ObserveWorkerCycle(observation WorkerCycleObservation) {
+	observer.observation = observation
 }
 
 type runnerQueue struct {

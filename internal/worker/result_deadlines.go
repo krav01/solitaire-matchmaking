@@ -17,6 +17,7 @@ type ResultDeadlineService interface {
 type ResultDeadlineOptions struct {
 	BatchSize    int
 	PollInterval time.Duration
+	Observer     WorkerObserver
 }
 
 func (options ResultDeadlineOptions) Validate() error {
@@ -30,10 +31,11 @@ func (options ResultDeadlineOptions) Validate() error {
 }
 
 type ResultDeadlineRunner struct {
-	service ResultDeadlineService
-	logger  *slog.Logger
-	options ResultDeadlineOptions
-	now     func() time.Time
+	service  ResultDeadlineService
+	logger   *slog.Logger
+	options  ResultDeadlineOptions
+	observer WorkerObserver
+	now      func() time.Time
 }
 
 func NewResultDeadlineRunner(service ResultDeadlineService, logger *slog.Logger, options ResultDeadlineOptions) (*ResultDeadlineRunner, error) {
@@ -43,7 +45,10 @@ func NewResultDeadlineRunner(service ResultDeadlineService, logger *slog.Logger,
 	if err := options.Validate(); err != nil {
 		return nil, err
 	}
-	return &ResultDeadlineRunner{service: service, logger: logger, options: options, now: time.Now}, nil
+	return &ResultDeadlineRunner{
+		service: service, logger: logger, options: options,
+		observer: configuredWorkerObserver(options.Observer), now: time.Now,
+	}, nil
 }
 
 func (runner *ResultDeadlineRunner) Run(ctx context.Context) {
@@ -62,7 +67,18 @@ func (runner *ResultDeadlineRunner) Run(ctx context.Context) {
 	}
 }
 
-func (runner *ResultDeadlineRunner) RunOnce(ctx context.Context) (int, error) {
+func (runner *ResultDeadlineRunner) RunOnce(ctx context.Context) (expiredCount int, runErr error) {
+	defer func() {
+		failed := 0
+		if runErr != nil {
+			failed = 1
+		}
+		runner.observer.ObserveWorkerCycle(WorkerCycleObservation{
+			Worker: WorkerResultDeadline, Claimed: expiredCount,
+			Succeeded: expiredCount, Failed: failed, Errored: runErr != nil,
+		})
+	}()
+
 	expired, err := runner.service.ExpireDue(ctx, tournament.ResultDeadlineBatch{
 		Limit: runner.options.BatchSize, ExpiredAt: runner.now().UTC(),
 	})

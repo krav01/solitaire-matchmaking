@@ -48,6 +48,7 @@ type RatingRunnerOptions struct {
 	LeaseDuration  time.Duration
 	PollInterval   time.Duration
 	FailureBackoff time.Duration
+	Observer       WorkerObserver
 }
 
 func (options RatingRunnerOptions) Validate() error {
@@ -68,11 +69,12 @@ type RatingRunResult struct {
 }
 
 type RatingRunner struct {
-	queue   RatingQueue
-	logger  *slog.Logger
-	options RatingRunnerOptions
-	now     func() time.Time
-	token   func() string
+	queue    RatingQueue
+	logger   *slog.Logger
+	options  RatingRunnerOptions
+	observer WorkerObserver
+	now      func() time.Time
+	token    func() string
 }
 
 func NewRatingRunner(queue RatingQueue, logger *slog.Logger, options RatingRunnerOptions) (*RatingRunner, error) {
@@ -82,7 +84,10 @@ func NewRatingRunner(queue RatingQueue, logger *slog.Logger, options RatingRunne
 	if err := options.Validate(); err != nil {
 		return nil, err
 	}
-	return &RatingRunner{queue: queue, logger: logger, options: options, now: time.Now, token: rand.Text}, nil
+	return &RatingRunner{
+		queue: queue, logger: logger, options: options,
+		observer: configuredWorkerObserver(options.Observer), now: time.Now, token: rand.Text,
+	}, nil
 }
 
 func (runner *RatingRunner) Run(ctx context.Context) {
@@ -102,7 +107,15 @@ func (runner *RatingRunner) Run(ctx context.Context) {
 	}
 }
 
-func (runner *RatingRunner) RunOnce(ctx context.Context) (RatingRunResult, error) {
+func (runner *RatingRunner) RunOnce(ctx context.Context) (result RatingRunResult, runErr error) {
+	defer func() {
+		runner.observer.ObserveWorkerCycle(WorkerCycleObservation{
+			Worker: WorkerRating, Claimed: result.Claimed,
+			Succeeded: result.Claimed - result.Failed, Failed: result.Failed,
+			Errored: runErr != nil,
+		})
+	}()
+
 	now := runner.now().UTC()
 	claim, err := runner.queue.ClaimNextRatingResult(ctx, RatingClaimRequest{
 		Token: runner.token(), ClaimedAt: now, LeaseUntil: now.Add(runner.options.LeaseDuration),
@@ -113,7 +126,7 @@ func (runner *RatingRunner) RunOnce(ctx context.Context) (RatingRunResult, error
 	if claim == nil {
 		return RatingRunResult{}, nil
 	}
-	result := RatingRunResult{Claimed: 1}
+	result = RatingRunResult{Claimed: 1}
 	updated, err := runner.queue.ProcessRatingResult(ctx, *claim, now)
 	if err == nil {
 		result.Updated = updated

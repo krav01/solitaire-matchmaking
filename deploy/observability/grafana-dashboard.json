@@ -1,0 +1,155 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "editable": true,
+  "graphTooltip": 1,
+  "panels": [
+    {
+      "datasource": {"type": "prometheus", "uid": "${datasource}"},
+      "fieldConfig": {"defaults": {"unit": "s"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+      "id": 1,
+      "targets": [{
+        "expr": "histogram_quantile(0.95, sum by (le, mode, capacity, policy_version, rating_model_version) (rate(solitaire_matchmaking_matchmaking_room_fill_seconds_bucket{mode=~\"$mode\",capacity=~\"$capacity\",policy_version=~\"$policy_version\",rating_model_version=~\"$rating_model_version\"}[15m])))",
+        "legendFormat": "{{mode}} / {{capacity}} / {{policy_version}} / {{rating_model_version}}",
+        "refId": "A"
+      }],
+      "title": "Room fill duration p95",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "${datasource}"},
+      "fieldConfig": {"defaults": {"max": 1, "min": 0, "unit": "percentunit"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+      "id": 2,
+      "targets": [{
+        "expr": "histogram_quantile(0.95, sum by (le, mode, capacity, policy_version, rating_model_version) (rate(solitaire_matchmaking_matchmaking_room_fill_timeout_ratio_bucket{mode=~\"$mode\",capacity=~\"$capacity\",policy_version=~\"$policy_version\",rating_model_version=~\"$rating_model_version\"}[15m])))",
+        "legendFormat": "{{mode}} / {{capacity}} / {{policy_version}} / {{rating_model_version}}",
+        "refId": "A"
+      }],
+      "title": "Fill-timeout utilization p95",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "${datasource}"},
+      "fieldConfig": {"defaults": {"max": 1, "min": 0, "unit": "percentunit"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+      "id": 3,
+      "targets": [{
+        "expr": "histogram_quantile(0.95, sum by (le, mode, capacity, policy_version, rating_model_version) (rate(solitaire_matchmaking_matchmaking_room_skill_gap_limit_ratio_bucket{mode=~\"$mode\",capacity=~\"$capacity\",policy_version=~\"$policy_version\",rating_model_version=~\"$rating_model_version\"}[15m])))",
+        "legendFormat": "{{mode}} / {{capacity}} / {{policy_version}} / {{rating_model_version}}",
+        "refId": "A"
+      }],
+      "title": "Skill-gap limit utilization p95",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "${datasource}"},
+      "fieldConfig": {"defaults": {"max": 1, "min": 0, "unit": "percentunit"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+      "id": 4,
+      "targets": [{
+        "expr": "histogram_quantile(0.95, sum by (le, mode, capacity, policy_version, rating_model_version) (rate(solitaire_matchmaking_matchmaking_room_win_probability_spread_limit_ratio_bucket{mode=~\"$mode\",capacity=~\"$capacity\",policy_version=~\"$policy_version\",rating_model_version=~\"$rating_model_version\"}[15m])))",
+        "legendFormat": "{{mode}} / {{capacity}} / {{policy_version}} / {{rating_model_version}}",
+        "refId": "A"
+      }],
+      "title": "Win-probability-spread limit utilization p95",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "${datasource}"},
+      "fieldConfig": {"defaults": {"unit": "ops"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 8, "x": 0, "y": 16},
+      "id": 5,
+      "targets": [{
+        "expr": "sum by (outcome) (rate(solitaire_matchmaking_matchmaking_attempts_total[5m]))",
+        "legendFormat": "{{outcome}}",
+        "refId": "A"
+      }],
+      "title": "Matchmaking outcomes",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "${datasource}"},
+      "fieldConfig": {"defaults": {"unit": "ops"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 8, "x": 8, "y": 16},
+      "id": 6,
+      "targets": [{
+        "expr": "sum by (worker) (rate(solitaire_matchmaking_worker_cycles_total{result=\"error\"}[5m]))",
+        "legendFormat": "{{worker}}",
+        "refId": "A"
+      }],
+      "title": "Worker error cycles",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "${datasource}"},
+      "fieldConfig": {"defaults": {"unit": "percentunit"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 8, "x": 16, "y": 16},
+      "id": 7,
+      "targets": [{
+        "expr": "sum(rate(solitaire_matchmaking_http_requests_total{status=~\"5..\"}[5m])) / clamp_min(sum(rate(solitaire_matchmaking_http_requests_total[5m])), 0.001)",
+        "legendFormat": "5xx ratio",
+        "refId": "A"
+      }],
+      "title": "HTTP server error ratio",
+      "type": "timeseries"
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 41,
+  "tags": ["solitaire", "matchmaking"],
+  "templating": {
+    "list": [
+      {
+        "current": {},
+        "label": "Prometheus",
+        "name": "datasource",
+        "query": "prometheus",
+        "type": "datasource"
+      },
+      {
+        "allValue": ".*",
+        "current": {},
+        "includeAll": true,
+        "label": "Mode",
+        "name": "mode",
+        "query": {"query": "label_values(solitaire_matchmaking_matchmaking_rooms_filled_total, mode)", "refId": "PrometheusVariableQueryEditor-Mode"},
+        "type": "query"
+      },
+      {
+        "allValue": ".*",
+        "current": {},
+        "includeAll": true,
+        "label": "Room size",
+        "name": "capacity",
+        "query": {"query": "label_values(solitaire_matchmaking_matchmaking_rooms_filled_total, capacity)", "refId": "PrometheusVariableQueryEditor-Capacity"},
+        "type": "query"
+      },
+      {
+        "allValue": ".*",
+        "current": {},
+        "includeAll": true,
+        "label": "Policy version",
+        "name": "policy_version",
+        "query": {"query": "label_values(solitaire_matchmaking_matchmaking_rooms_filled_total, policy_version)", "refId": "PrometheusVariableQueryEditor-PolicyVersion"},
+        "type": "query"
+      },
+      {
+        "allValue": ".*",
+        "current": {},
+        "includeAll": true,
+        "label": "Rating model version",
+        "name": "rating_model_version",
+        "query": {"query": "label_values(solitaire_matchmaking_matchmaking_rooms_filled_total, rating_model_version)", "refId": "PrometheusVariableQueryEditor-RatingModelVersion"},
+        "type": "query"
+      }
+    ]
+  },
+  "time": {"from": "now-6h", "to": "now"},
+  "timezone": "browser",
+  "title": "Solitaire Matchmaking Operations",
+  "uid": "solitaire-matchmaking-operations",
+  "version": 1
+}

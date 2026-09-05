@@ -22,6 +22,7 @@ type RunnerOptions struct {
 	LeaseDuration  time.Duration
 	PollInterval   time.Duration
 	FailureBackoff time.Duration
+	Observer       WorkerObserver
 }
 
 func (options RunnerOptions) Validate() error {
@@ -47,12 +48,13 @@ type RunResult struct {
 }
 
 type Runner struct {
-	queue   QueueRepository
-	handler Handler
-	logger  *slog.Logger
-	options RunnerOptions
-	now     func() time.Time
-	token   func() string
+	queue    QueueRepository
+	handler  Handler
+	logger   *slog.Logger
+	options  RunnerOptions
+	observer WorkerObserver
+	now      func() time.Time
+	token    func() string
 }
 
 func NewRunner(queue QueueRepository, handler Handler, logger *slog.Logger, options RunnerOptions) (*Runner, error) {
@@ -62,7 +64,10 @@ func NewRunner(queue QueueRepository, handler Handler, logger *slog.Logger, opti
 	if err := options.Validate(); err != nil {
 		return nil, err
 	}
-	return &Runner{queue: queue, handler: handler, logger: logger, options: options, now: time.Now, token: rand.Text}, nil
+	return &Runner{
+		queue: queue, handler: handler, logger: logger, options: options,
+		observer: configuredWorkerObserver(options.Observer), now: time.Now, token: rand.Text,
+	}, nil
 }
 
 func (runner *Runner) Run(ctx context.Context) {
@@ -82,7 +87,15 @@ func (runner *Runner) Run(ctx context.Context) {
 	}
 }
 
-func (runner *Runner) RunOnce(ctx context.Context) (RunResult, error) {
+func (runner *Runner) RunOnce(ctx context.Context) (result RunResult, runErr error) {
+	defer func() {
+		runner.observer.ObserveWorkerCycle(WorkerCycleObservation{
+			Worker: WorkerMatchmaking, Claimed: result.Claimed,
+			Succeeded: result.Claimed - result.Failed, Failed: result.Failed,
+			Errored: runErr != nil,
+		})
+	}()
+
 	now := runner.now().UTC()
 	claims, err := runner.queue.ClaimMatchmakingTickets(ctx, ClaimRequest{
 		Token: runner.token(), Limit: runner.options.BatchSize,
@@ -91,7 +104,7 @@ func (runner *Runner) RunOnce(ctx context.Context) (RunResult, error) {
 	if err != nil {
 		return RunResult{}, fmt.Errorf("claim matchmaking tickets: %w", err)
 	}
-	result := RunResult{Claimed: len(claims)}
+	result = RunResult{Claimed: len(claims)}
 	if len(claims) == 0 {
 		return result, nil
 	}

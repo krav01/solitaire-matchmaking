@@ -38,10 +38,16 @@ type QueryReader interface {
 	GetRating(context.Context, string, string) (tournament.PlayerRating, error)
 }
 
+type HTTPMetrics interface {
+	Handler() http.Handler
+	ObserveHTTPRequest(method, route string, status int, duration time.Duration)
+}
+
 type Options struct {
 	APIToken         string
 	ReadinessTimeout time.Duration
 	ShutdownTimeout  time.Duration
+	Metrics          HTTPMetrics
 }
 
 type Server struct {
@@ -55,7 +61,12 @@ func New(check Readiness, tickets TicketManager, results ResultFinalizer, querie
 	if check == nil || tickets == nil || results == nil || queries == nil || logger == nil {
 		return nil, errors.New("readiness checker, ticket manager, result finalizer, query reader and logger are required")
 	}
-	if len(opts.APIToken) < 32 || opts.ReadinessTimeout <= 0 || opts.ReadinessTimeout > 5*time.Second || opts.ShutdownTimeout <= 0 {
+	if len(opts.APIToken) < 32 || opts.ReadinessTimeout <= 0 || opts.ReadinessTimeout > 5*time.Second ||
+		opts.ShutdownTimeout <= 0 || opts.Metrics == nil {
+		return nil, errors.New("invalid HTTP server options")
+	}
+	metricsHandler := opts.Metrics.Handler()
+	if metricsHandler == nil {
 		return nil, errors.New("invalid HTTP server options")
 	}
 	s := &Server{logger: logger, shutdown: opts.ShutdownTimeout}
@@ -82,29 +93,82 @@ func New(check Readiness, tickets TicketManager, results ResultFinalizer, querie
 			return
 		}
 		s.respond(w, r, http.StatusOK, map[string]any{
-			"service": "solitaire-matchmaking", "stage": "transactional_event_delivery",
+			"service": "solitaire-matchmaking", "stage": "operational_observability",
 			"rating_enabled": true, "matchmaking_enabled": true, "ticket_lifecycle_enabled": true,
 			"result_ingestion_enabled": true,
 			"outbox_delivery_enabled":  true,
+			"metrics_enabled":          true,
 			"planned_room_sizes":       []int{5, 6, 7},
 		})
+	})
+	mux.HandleFunc("GET /metrics", func(w http.ResponseWriter, r *http.Request) {
+		if !s.authorize(w, r, expectedToken) {
+			return
+		}
+		metricsHandler.ServeHTTP(w, r)
 	})
 	s.registerTicketRoutes(mux, tickets, expectedToken)
 	s.registerResultRoutes(mux, results, expectedToken)
 	s.registerQueryRoutes(mux, queries, expectedToken)
+	baseHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Request-ID", rand.Text())
+		w.Header().Set("Cache-Control", "no-store")
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		mux.ServeHTTP(w, r)
+	})
 	s.http = &http.Server{
-		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("X-Request-ID", rand.Text())
-			w.Header().Set("Cache-Control", "no-store")
-			w.Header().Set("X-Content-Type-Options", "nosniff")
-			mux.ServeHTTP(w, r)
-		}),
+		Handler:           observeHTTPRequests(baseHandler, opts.Metrics),
 		ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second,
 		WriteTimeout: 15 * time.Second, IdleTimeout: 60 * time.Second,
 		MaxHeaderBytes: 16 << 10,
 		ErrorLog:       slog.NewLogLogger(logger.Handler(), slog.LevelError),
 	}
 	return s, nil
+}
+
+type statusWriter struct {
+	http.ResponseWriter
+	status int
+}
+
+func (writer *statusWriter) WriteHeader(status int) {
+	if writer.status != 0 {
+		return
+	}
+	writer.status = status
+	writer.ResponseWriter.WriteHeader(status)
+}
+
+func (writer *statusWriter) Write(body []byte) (int, error) {
+	if writer.status == 0 {
+		writer.status = http.StatusOK
+	}
+
+	return writer.ResponseWriter.Write(body)
+}
+
+func (writer *statusWriter) Unwrap() http.ResponseWriter {
+	return writer.ResponseWriter
+}
+
+func observeHTTPRequests(next http.Handler, metrics HTTPMetrics) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		startedAt := time.Now()
+		writer := &statusWriter{ResponseWriter: w}
+		next.ServeHTTP(writer, r)
+		status := writer.status
+		if status == 0 {
+			status = http.StatusOK
+		}
+		route := r.Pattern
+		if _, pattern, found := strings.Cut(route, " "); found {
+			route = pattern
+		}
+		if route == "" {
+			route = "unmatched"
+		}
+		metrics.ObserveHTTPRequest(r.Method, route, status, time.Since(startedAt))
+	})
 }
 
 func (s *Server) authorize(w http.ResponseWriter, r *http.Request, expectedToken [sha256.Size]byte) bool {
