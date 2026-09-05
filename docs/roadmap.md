@@ -49,7 +49,7 @@
 
 - [x] document implemented HTTP API, outbound envelope and game-backend receiver example
 - [x] complete ticket command/query HTTP adapters and external onboarding contract
-- [ ] complete room and rating query HTTP adapters
+- [x] complete room and rating query HTTP adapters
 - observability dashboards and alerts for speed, fairness and reliability
 - load, recovery and failure-injection scenarios
 - deployment guide, security review and release checklist

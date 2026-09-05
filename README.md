@@ -29,7 +29,9 @@ calibration. Paired segment comparisons and revision-fenced activation with
 one-step rollback complete the Stage 5 governance boundary; the placement-only
 baseline remains active until a candidate passes real-data thresholds.
 Authenticated ticket endpoints now accept idempotent entries, cancel queued
-tickets and expose assignment state for game-backend polling.
+tickets and expose assignment state for game-backend polling. Read-only room and
+rating endpoints now expose lifecycle composition and the latest persisted,
+version-explicit player estimate for diagnostics and reconciliation.
 
 ## Architecture
 
@@ -97,7 +99,7 @@ curl -H "Authorization: Bearer $API_TOKEN" \
   http://127.0.0.1:8080/v1/capabilities
 ```
 
-Ticket lifecycle and verified-result request/response schemas are documented in
+Ticket, room, rating and verified-result request/response schemas are documented in
 [`api/openapi.yaml`](api/openapi.yaml). Identical retries return the stored result;
 late, partial or identity-conflicting results are rejected.
 
@@ -109,7 +111,7 @@ make security
 ```
 
 The current API and outbound webhook are documented in
-[`api/openapi.yaml`](api/openapi.yaml). Retry rules, event payload fields and the
-remaining HTTP surface are listed in [the integration contract](docs/api-contract.md).
+[`api/openapi.yaml`](api/openapi.yaml). Retry rules and event payload fields are
+listed in [the integration contract](docs/api-contract.md).
 Run the [game-backend example](examples/game-backend/README.md) to exercise
 authenticated event delivery and in-process deduplication.
