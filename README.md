@@ -25,7 +25,9 @@ integration now verifies the complete path from five accepted tickets through
 room completion, rating persistence and authenticated event delivery. Stage 5
 adds version-bound raw feature encoding with explicit missing-value and
 correlation guards, training-only standardization and time-ordered holdout
-calibration; the placement-only baseline remains active.
+calibration. Paired segment comparisons and revision-fenced activation with
+one-step rollback complete the Stage 5 governance boundary; the placement-only
+baseline remains active until a candidate passes real-data thresholds.
 
 ## Architecture
 

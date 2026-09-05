@@ -43,7 +43,7 @@
 - [x] feature definitions aligned with scoring-rule and deck versions
 - [x] missing-value and correlated-feature handling
 - [x] time-ordered training and holdout evaluation
-- baseline comparison, segment checks and version activation/rollback
+- [x] baseline comparison, segment checks and version activation/rollback
 
 ## Stage 6 — Integration and release validation
 
