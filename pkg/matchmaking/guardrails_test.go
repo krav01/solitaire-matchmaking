@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/krav01/solitaire-matchmaking/pkg/matchmaking"
+	"github.com/krav01/solitaire-matchmaking/pkg/rating"
 )
 
 func BenchmarkSelectRoom(b *testing.B) {
@@ -17,7 +18,14 @@ func BenchmarkSelectRoom(b *testing.B) {
 		rooms[i].RoomID = fmt.Sprintf("room-%03d", i)
 	}
 	candidate := testCandidate("candidate", "candidate-player", 25, evaluatedAt.Add(-time.Minute), evaluatedAt.Add(-time.Minute))
-	evaluator := newEvaluator(b)
+	model, err := rating.NewBaseline(rating.DefaultBaselineConfig("rating-v1"))
+	if err != nil {
+		b.Fatalf("NewBaseline() error = %v", err)
+	}
+	evaluator, err := matchmaking.NewEvaluator(model)
+	if err != nil {
+		b.Fatalf("NewEvaluator() error = %v", err)
+	}
 
 	b.ReportAllocs()
 	b.ResetTimer()
