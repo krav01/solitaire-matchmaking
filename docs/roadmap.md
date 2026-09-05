@@ -51,5 +51,5 @@
 - [x] complete ticket command/query HTTP adapters and external onboarding contract
 - [x] complete room and rating query HTTP adapters
 - [x] observability dashboards and alerts for speed, fairness and reliability
-- load, recovery and failure-injection scenarios
+- [x] load, recovery and failure-injection scenarios
 - deployment guide, security review and release checklist
