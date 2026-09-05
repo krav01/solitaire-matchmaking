@@ -16,16 +16,16 @@ func TestEvaluatorFilterAppliesEligibilityInInputOrder(t *testing.T) {
 	evaluator := newEvaluator(t)
 	evaluatedAt := createdAt.Add(10 * time.Second)
 	candidates := []matchmaking.Candidate{
-		testCandidate("accepted", "player-5", 27, createdAt, evaluatedAt),
-		testCandidate(room.Members[0].TicketID, "other-player", 25, createdAt, evaluatedAt),
-		testCandidate("duplicate-player", room.Members[1].PlayerID, 25, createdAt, evaluatedAt),
+		testCandidate("accepted", "player-5", 27, createdAt, createdAt),
+		testCandidate(room.Members[0].TicketID, "other-player", 25, createdAt, createdAt),
+		testCandidate("duplicate-player", room.Members[1].PlayerID, 25, createdAt, createdAt),
 		func() matchmaking.Candidate {
-			candidate := testCandidate("wrong-model", "player-6", 25, createdAt, evaluatedAt)
+			candidate := testCandidate("wrong-model", "player-6", 25, createdAt, createdAt)
 			candidate.Rating.ModelVersion = "rating-v2"
 			return candidate
 		}(),
 		func() matchmaking.Candidate {
-			candidate := testCandidate("future-snapshot", "player-7", 25, createdAt, evaluatedAt)
+			candidate := testCandidate("future-snapshot", "player-7", 25, createdAt, createdAt)
 			candidate.SnapshotAt = evaluatedAt.Add(time.Second)
 			return candidate
 		}(),
@@ -69,7 +69,7 @@ func TestEvaluatorRejectsWholeRoomSkillGap(t *testing.T) {
 	createdAt := time.Date(2026, time.September, 4, 3, 0, 0, 0, time.UTC)
 	room := testRoom(createdAt, 5, []float64{20, 21, 22, 23})
 	room.Policy.MaxSkillGap = 5
-	candidate := testCandidate("candidate", "player-5", 17, createdAt, createdAt.Add(10*time.Second))
+	candidate := testCandidate("candidate", "player-5", 17, createdAt, createdAt)
 
 	decisions, err := newEvaluator(t).Filter(room, []matchmaking.Candidate{candidate}, createdAt.Add(10*time.Second))
 	if err != nil {
@@ -100,7 +100,7 @@ func TestEvaluatorRejectsExpiredRoom(t *testing.T) {
 	t.Parallel()
 	createdAt := time.Date(2026, time.September, 4, 3, 0, 0, 0, time.UTC)
 	room := testRoom(createdAt, 5, nil)
-	candidate := testCandidate("candidate", "player-1", 25, createdAt, createdAt.Add(10*time.Second))
+	candidate := testCandidate("candidate", "player-1", 25, createdAt, createdAt)
 
 	decisions, err := newEvaluator(t).Filter(room, []matchmaking.Candidate{candidate}, room.Deadline.Add(time.Nanosecond))
 	if err != nil {
@@ -194,7 +194,7 @@ func testRoom(createdAt time.Time, capacity int, means []float64) matchmaking.Ro
 			"player-"+string(rune('1'+index)),
 			mean,
 			createdAt.Add(-time.Second),
-			createdAt,
+			createdAt.Add(-time.Second),
 		)
 	}
 	return room

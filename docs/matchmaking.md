@@ -61,8 +61,20 @@ path rather than the only source of progress.
 
 The result is still advisory. The application atomically confirms that the ticket
 is waiting, the room has capacity and the scored room version is unchanged. A
-stale selection returns to matching instead of weakening fairness. Persisting
-future retry wake-ups remains part of the worker stage.
+stale selection returns to matching instead of weakening fairness.
+
+Retry wake-ups are persisted on the ticket. Workers claim only due tickets in
+bounded batches with `FOR UPDATE SKIP LOCKED`, release row locks before scoring,
+and fence assignment, retry and expiry by a lease token. A stale room version is
+retried quickly; it never widens the hard fairness boundary.
+
+## Persisted policy definition
+
+The immutable `matching_policies.definition` object uses millisecond durations:
+`initial_skill_gap`, `max_skill_gap`, `max_win_probability_spread`,
+`expansion_interval_ms`, `fill_timeout_ms`, `age_priority_after_ms`,
+`candidate_limit`, `room_limit` and `prefer_nearly_full`. The worker validates
+the decoded policy before querying rooms or evaluating a ticket.
 
 ## Integration boundary
 

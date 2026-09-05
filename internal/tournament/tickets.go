@@ -18,6 +18,7 @@ var (
 	ErrTicketNotQueued     = errors.New("ticket is not queued")
 	ErrRoomNotAvailable    = errors.New("room is not available for assignment")
 	ErrAssignmentConflict  = errors.New("assignment identity conflicts with stored assignment")
+	ErrTicketClaimLost     = errors.New("ticket claim is no longer owned")
 )
 
 const digestLength = 64
@@ -122,6 +123,39 @@ type AssignTicketCommand struct {
 	TicketEventID       string
 	RoomFilledEventID   string
 	AssignedAt          time.Time
+	ClaimToken          string
+}
+
+// ExpireTicketCommand is an internal, lease-fenced terminal transition. The
+// processing time and lease token are excluded from retry equality.
+type ExpireTicketCommand struct {
+	TicketID   string
+	CommandID  string
+	EventID    string
+	ClaimToken string
+	Deadline   time.Time
+	ExpiredAt  time.Time
+}
+
+func (command ExpireTicketCommand) Validate() error {
+	if command.TicketID == "" || command.CommandID == "" || command.EventID == "" || command.ClaimToken == "" {
+		return errors.New("ticket, command, event and claim identities are required")
+	}
+	if command.Deadline.IsZero() || command.ExpiredAt.IsZero() || command.ExpiredAt.Before(command.Deadline) {
+		return errors.New("ticket expiry requires an expired deadline")
+	}
+	return nil
+}
+
+func (command ExpireTicketCommand) RequestDigest() (string, error) {
+	if err := command.Validate(); err != nil {
+		return "", err
+	}
+	return sha256Digest(struct {
+		TicketID  string    `json:"ticket_id"`
+		CommandID string    `json:"command_id"`
+		Deadline  time.Time `json:"deadline"`
+	}{TicketID: command.TicketID, CommandID: command.CommandID, Deadline: command.Deadline.UTC()})
 }
 
 func (command AssignTicketCommand) Validate() error {
@@ -183,6 +217,7 @@ type TicketLifecycleRepository interface {
 	AcceptTicket(context.Context, AcceptTicketCommand) (TicketMutation, error)
 	CancelTicket(context.Context, CancelTicketCommand) (TicketMutation, error)
 	AssignTicket(context.Context, AssignTicketCommand) (Assignment, error)
+	ExpireTicket(context.Context, ExpireTicketCommand) (TicketMutation, error)
 }
 
 type TicketService struct {
@@ -215,6 +250,13 @@ func (service *TicketService) Assign(ctx context.Context, command AssignTicketCo
 		return Assignment{}, err
 	}
 	return service.repository.AssignTicket(ctx, command)
+}
+
+func (service *TicketService) Expire(ctx context.Context, command ExpireTicketCommand) (TicketMutation, error) {
+	if err := command.Validate(); err != nil {
+		return TicketMutation{}, err
+	}
+	return service.repository.ExpireTicket(ctx, command)
 }
 
 func sha256Digest(value any) (string, error) {

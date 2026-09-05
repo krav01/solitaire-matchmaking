@@ -65,6 +65,16 @@ func TestCommandDigestsIgnoreProcessingTimeAndEventIdentities(t *testing.T) {
 	assignRetry.RoomFilledEventID = "room-event-2"
 	assignRetry.AssignedAt = now.Add(time.Minute)
 	assertSameDigest(t, assign.RequestDigest, assignRetry.RequestDigest)
+
+	expire := tournament.ExpireTicketCommand{
+		TicketID: "ticket-1", CommandID: "expire-1", EventID: "event-1",
+		ClaimToken: "claim-1", Deadline: now, ExpiredAt: now,
+	}
+	expireRetry := expire
+	expireRetry.EventID = "event-2"
+	expireRetry.ClaimToken = "claim-2"
+	expireRetry.ExpiredAt = now.Add(time.Minute)
+	assertSameDigest(t, expire.RequestDigest, expireRetry.RequestDigest)
 }
 
 func TestAcceptTicketRejectsInvalidRatingBeforeRepository(t *testing.T) {
@@ -132,4 +142,9 @@ func (repository *recordingTicketRepository) CancelTicket(context.Context, tourn
 func (repository *recordingTicketRepository) AssignTicket(context.Context, tournament.AssignTicketCommand) (tournament.Assignment, error) {
 	repository.calls++
 	return tournament.Assignment{}, nil
+}
+
+func (repository *recordingTicketRepository) ExpireTicket(context.Context, tournament.ExpireTicketCommand) (tournament.TicketMutation, error) {
+	repository.calls++
+	return tournament.TicketMutation{}, nil
 }

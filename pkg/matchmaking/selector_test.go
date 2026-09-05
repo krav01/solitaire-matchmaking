@@ -18,7 +18,7 @@ func TestSelectRoomPrefersNearlyFullEligibleRoom(t *testing.T) {
 	nearlyFull.AggregateVersion = 42
 	rooms := []matchmaking.RoomView{lessFull, nearlyFull}
 	original := cloneRooms(rooms)
-	candidate := testCandidate("candidate", "new-player", 25, evaluatedAt.Add(-time.Minute), evaluatedAt)
+	candidate := testCandidate("candidate", "new-player", 25, evaluatedAt.Add(-time.Minute), evaluatedAt.Add(-time.Minute))
 
 	selection, found, err := newEvaluator(t).SelectRoom(rooms, candidate, evaluatedAt)
 	if err != nil {
@@ -39,7 +39,7 @@ func TestSelectRoomAgePriorityOverridesFillPreference(t *testing.T) {
 	old.RoomID = "old"
 	nearlyFull := testRoom(evaluatedAt.Add(-5*time.Second), 5, []float64{25, 25, 25, 25})
 	nearlyFull.RoomID = "nearly-full"
-	candidate := testCandidate("candidate", "new-player", 25, evaluatedAt.Add(-time.Minute), evaluatedAt)
+	candidate := testCandidate("candidate", "new-player", 25, evaluatedAt.Add(-time.Minute), evaluatedAt.Add(-time.Minute))
 
 	selection, found, err := newEvaluator(t).SelectRoom([]matchmaking.RoomView{nearlyFull, old}, candidate, evaluatedAt)
 	if err != nil {
@@ -57,7 +57,7 @@ func TestSelectRoomSkipsIneligibleNearlyFullRoom(t *testing.T) {
 	eligible.RoomID = "eligible"
 	ineligible := testRoom(evaluatedAt.Add(-5*time.Second), 5, []float64{35, 35, 35, 35})
 	ineligible.RoomID = "ineligible-nearly-full"
-	candidate := testCandidate("candidate", "new-player", 25, evaluatedAt.Add(-time.Minute), evaluatedAt)
+	candidate := testCandidate("candidate", "new-player", 25, evaluatedAt.Add(-time.Minute), evaluatedAt.Add(-time.Minute))
 
 	selection, found, err := newEvaluator(t).SelectRoom([]matchmaking.RoomView{ineligible, eligible}, candidate, evaluatedAt)
 	if err != nil {
@@ -73,7 +73,7 @@ func TestSelectRoomReturnsNotFoundWhenHardFairnessRejectsAllRooms(t *testing.T) 
 	evaluatedAt := time.Date(2026, time.September, 4, 5, 0, 30, 0, time.UTC)
 	room := testRoom(evaluatedAt.Add(-30*time.Second), 5, []float64{25})
 	room.Policy.MaxSkillGap = 5
-	candidate := testCandidate("candidate", "new-player", 40, evaluatedAt.Add(-time.Minute), evaluatedAt)
+	candidate := testCandidate("candidate", "new-player", 40, evaluatedAt.Add(-time.Minute), evaluatedAt.Add(-time.Minute))
 
 	selection, found, err := newEvaluator(t).SelectRoom([]matchmaking.RoomView{room}, candidate, evaluatedAt)
 	if err != nil {
@@ -90,7 +90,7 @@ func TestSelectRoomEnforcesHomogeneousBoundedScope(t *testing.T) {
 	first := testRoom(evaluatedAt.Add(-5*time.Second), 5, nil)
 	second := testRoom(evaluatedAt.Add(-5*time.Second), 5, nil)
 	second.RoomID = "room-2"
-	candidate := testCandidate("candidate", "new-player", 25, evaluatedAt.Add(-time.Minute), evaluatedAt)
+	candidate := testCandidate("candidate", "new-player", 25, evaluatedAt.Add(-time.Minute), evaluatedAt.Add(-time.Minute))
 
 	second.ModeID = "draw-three"
 	if _, _, err := newEvaluator(t).SelectRoom([]matchmaking.RoomView{first, second}, candidate, evaluatedAt); err == nil {

@@ -12,14 +12,20 @@ import (
 )
 
 type Config struct {
-	HTTPAddr         string
-	DatabaseURL      string
-	APIToken         string
-	DBMaxConns       int32
-	StartupTimeout   time.Duration
-	ReadinessTimeout time.Duration
-	ShutdownTimeout  time.Duration
-	LogLevel         slog.Level
+	HTTPAddr             string
+	DatabaseURL          string
+	APIToken             string
+	DBMaxConns           int32
+	StartupTimeout       time.Duration
+	ReadinessTimeout     time.Duration
+	ShutdownTimeout      time.Duration
+	LogLevel             slog.Level
+	MatchBatchSize       int
+	MatchConcurrency     int
+	MatchLease           time.Duration
+	MatchPollInterval    time.Duration
+	MatchFailureBackoff  time.Duration
+	MatchStaleRetryDelay time.Duration
 }
 
 // Load accepts an environment accessor to keep tests isolated from os.Environ.
@@ -29,6 +35,9 @@ func Load(getenv func(string) string) (Config, error) {
 		APIToken: getenv("API_TOKEN"), DBMaxConns: 10,
 		StartupTimeout: 10 * time.Second, ReadinessTimeout: 2 * time.Second,
 		ShutdownTimeout: 10 * time.Second, LogLevel: slog.LevelInfo,
+		MatchBatchSize: 32, MatchConcurrency: 8, MatchLease: 10 * time.Second,
+		MatchPollInterval: 100 * time.Millisecond, MatchFailureBackoff: time.Second,
+		MatchStaleRetryDelay: 50 * time.Millisecond,
 	}
 	if value := getenv("HTTP_ADDR"); value != "" {
 		c.HTTPAddr = value
@@ -42,11 +51,31 @@ func Load(getenv func(string) string) (Config, error) {
 	}
 	for _, entry := range []struct {
 		key    string
+		target *int
+		max    int
+	}{
+		{"MATCH_WORKER_BATCH_SIZE", &c.MatchBatchSize, 256},
+		{"MATCH_WORKER_CONCURRENCY", &c.MatchConcurrency, 256},
+	} {
+		if value := getenv(entry.key); value != "" {
+			n, err := strconv.Atoi(value)
+			if err != nil || n < 1 || n > entry.max {
+				return Config{}, fmt.Errorf("%s must be between 1 and %d", entry.key, entry.max)
+			}
+			*entry.target = n
+		}
+	}
+	for _, entry := range []struct {
+		key    string
 		target *time.Duration
 	}{
 		{"STARTUP_TIMEOUT", &c.StartupTimeout},
 		{"READINESS_TIMEOUT", &c.ReadinessTimeout},
 		{"SHUTDOWN_TIMEOUT", &c.ShutdownTimeout},
+		{"MATCH_WORKER_LEASE", &c.MatchLease},
+		{"MATCH_WORKER_POLL_INTERVAL", &c.MatchPollInterval},
+		{"MATCH_WORKER_FAILURE_BACKOFF", &c.MatchFailureBackoff},
+		{"MATCH_WORKER_STALE_RETRY_DELAY", &c.MatchStaleRetryDelay},
 	} {
 		if value := getenv(entry.key); value != "" {
 			d, err := time.ParseDuration(value)
@@ -58,6 +87,12 @@ func Load(getenv func(string) string) (Config, error) {
 	}
 	if c.ReadinessTimeout > 5*time.Second {
 		return Config{}, errors.New("READINESS_TIMEOUT cannot exceed five seconds")
+	}
+	if c.MatchConcurrency > c.MatchBatchSize {
+		return Config{}, errors.New("MATCH_WORKER_CONCURRENCY cannot exceed MATCH_WORKER_BATCH_SIZE")
+	}
+	if c.MatchStaleRetryDelay > time.Second {
+		return Config{}, errors.New("MATCH_WORKER_STALE_RETRY_DELAY cannot exceed one second")
 	}
 	if value := getenv("LOG_LEVEL"); value != "" {
 		if err := c.LogLevel.UnmarshalText([]byte(value)); err != nil {

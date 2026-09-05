@@ -12,7 +12,7 @@ func TestAttemptMatchSelectsRoomOnQueueEvents(t *testing.T) {
 	t.Parallel()
 	evaluatedAt := time.Date(2026, time.September, 4, 6, 0, 10, 0, time.UTC)
 	room := testRoom(evaluatedAt.Add(-5*time.Second), 5, []float64{25, 25, 25, 25})
-	candidate := testCandidate("candidate", "new-player", 25, evaluatedAt.Add(-time.Second), evaluatedAt)
+	candidate := testCandidate("candidate", "new-player", 25, evaluatedAt.Add(-time.Second), evaluatedAt.Add(-time.Second))
 	for _, trigger := range []matchmaking.AttemptTrigger{
 		matchmaking.AttemptTriggerTicketAccepted,
 		matchmaking.AttemptTriggerRoomChanged,
@@ -50,7 +50,7 @@ func TestAttemptMatchSchedulesEarliestRoomExpansion(t *testing.T) {
 	base := time.Date(2026, time.September, 4, 6, 30, 0, 0, time.UTC)
 	evaluatedAt := base.Add(6 * time.Second)
 	room := testRoom(base.Add(3*time.Second), 5, []float64{25})
-	candidate := testCandidate("candidate", "new-player", 29, base, evaluatedAt)
+	candidate := testCandidate("candidate", "new-player", 29, base, base)
 
 	result, err := newEvaluator(t).AttemptMatch(matchmaking.MatchAttempt{
 		Trigger:     matchmaking.AttemptTriggerPeriodicRetry,

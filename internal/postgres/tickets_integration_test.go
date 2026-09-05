@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/krav01/solitaire-matchmaking/internal/postgres"
 	"github.com/krav01/solitaire-matchmaking/internal/tournament"
+	"github.com/krav01/solitaire-matchmaking/internal/worker"
 	"github.com/krav01/solitaire-matchmaking/pkg/rating"
 )
 
@@ -173,6 +174,169 @@ func TestTicketLifecyclePostgreSQL(t *testing.T) {
 	assertLifecycleRows(t, ctx, pool, roomID, prefix)
 }
 
+func TestMatchmakingWorkerPostgreSQL(t *testing.T) {
+	databaseURL := os.Getenv("TEST_DATABASE_URL")
+	if databaseURL == "" {
+		t.Skip("TEST_DATABASE_URL is not set")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	pool, err := postgres.Open(ctx, databaseURL, 12)
+	if err != nil {
+		t.Fatalf("open PostgreSQL: %v", err)
+	}
+	defer pool.Close()
+	if _, err := postgres.ApplyMigrations(ctx, pool); err != nil {
+		t.Fatalf("ApplyMigrations() error = %v", err)
+	}
+
+	prefix := fmt.Sprintf("worker-%d", time.Now().UnixNano())
+	modelVersion := prefix + "-model"
+	policyVersion := prefix + "-policy"
+	tournamentID := prefix + "-tournament"
+	roomID := prefix + "-room"
+	startedAt := time.Now().UTC().Truncate(time.Millisecond)
+	seedLifecycleConfig(t, ctx, pool, modelVersion, policyVersion, tournamentID, "v1", roomID, startedAt)
+
+	ticketStore, err := postgres.NewTicketStore(pool)
+	if err != nil {
+		t.Fatalf("NewTicketStore() error = %v", err)
+	}
+	ticketService, err := tournament.NewTicketService(ticketStore)
+	if err != nil {
+		t.Fatalf("NewTicketService() error = %v", err)
+	}
+	queue, err := postgres.NewMatchmakingQueue(pool)
+	if err != nil {
+		t.Fatalf("NewMatchmakingQueue() error = %v", err)
+	}
+	processor, err := worker.NewMatchProcessor(queue, queue, ticketService, 50*time.Millisecond)
+	if err != nil {
+		t.Fatalf("NewMatchProcessor() error = %v", err)
+	}
+
+	for index := range 5 {
+		command := lifecycleAcceptCommand(fmt.Sprintf("%s-player-%d", prefix, index), tournamentID, "v1", modelVersion, startedAt)
+		if _, err := ticketService.Accept(ctx, command); err != nil {
+			t.Fatalf("Accept(player %d) error = %v", index, err)
+		}
+	}
+
+	evaluatedAt := startedAt
+	for round := range 10 {
+		claims := claimConcurrently(t, ctx, queue, prefix, round, evaluatedAt)
+		if round == 0 {
+			if len(claims) != 5 {
+				t.Fatalf("first concurrent claim count = %d, want 5", len(claims))
+			}
+			seen := make(map[string]struct{}, len(claims))
+			for _, claim := range claims {
+				if _, duplicate := seen[claim.Ticket.ID]; duplicate {
+					t.Fatalf("ticket %q was claimed twice", claim.Ticket.ID)
+				}
+				seen[claim.Ticket.ID] = struct{}{}
+			}
+		}
+		processClaims(t, ctx, processor, claims, evaluatedAt)
+
+		var queued int
+		if err := pool.QueryRow(ctx, `
+SELECT count(*) FROM matchmaking_tickets
+WHERE tournament_id = $1 AND status = 'queued'`, tournamentID).Scan(&queued); err != nil {
+			t.Fatalf("count queued tickets: %v", err)
+		}
+		if queued == 0 {
+			break
+		}
+		if round == 9 {
+			t.Fatalf("worker left %d tickets queued", queued)
+		}
+		evaluatedAt = evaluatedAt.Add(100 * time.Millisecond)
+	}
+	assertLifecycleRows(t, ctx, pool, roomID, prefix)
+
+	expiring := lifecycleAcceptCommand(prefix+"-expiring", tournamentID, "v1", modelVersion, startedAt)
+	if _, err := ticketService.Accept(ctx, expiring); err != nil {
+		t.Fatalf("Accept(expiring) error = %v", err)
+	}
+	deadline := startedAt.Add(time.Minute)
+	claims, err := queue.ClaimMatchmakingTickets(ctx, worker.ClaimRequest{
+		Token: prefix + "-expiry-claim", Limit: 1,
+		ClaimedAt: deadline, LeaseUntil: deadline.Add(10 * time.Second),
+	})
+	if err != nil || len(claims) != 1 {
+		t.Fatalf("expiry claim = %+v, error = %v", claims, err)
+	}
+	if err := processor.Handle(ctx, claims[0], deadline); err != nil {
+		t.Fatalf("Handle(expiry) error = %v", err)
+	}
+	var status string
+	var expiryEvents int
+	if err := pool.QueryRow(ctx, `
+SELECT ticket.status,
+       (SELECT count(*) FROM outbox_events WHERE aggregate_id = ticket.ticket_id AND event_type = 'ticket.expired')
+FROM matchmaking_tickets AS ticket
+WHERE ticket.ticket_id = $1`, expiring.Ticket.ID).Scan(&status, &expiryEvents); err != nil {
+		t.Fatalf("read expired ticket: %v", err)
+	}
+	if status != "expired" || expiryEvents != 1 {
+		t.Fatalf("expired ticket status = %q, events = %d", status, expiryEvents)
+	}
+}
+
+func claimConcurrently(t *testing.T, ctx context.Context, queue *postgres.MatchmakingQueue, prefix string, round int, claimedAt time.Time) []worker.TicketClaim {
+	t.Helper()
+	outcomes := make(chan []worker.TicketClaim, 2)
+	errorsFound := make(chan error, 2)
+	var group sync.WaitGroup
+	for index := range 2 {
+		group.Add(1)
+		go func(index int) {
+			defer group.Done()
+			claims, err := queue.ClaimMatchmakingTickets(ctx, worker.ClaimRequest{
+				Token: fmt.Sprintf("%s-round-%d-worker-%d", prefix, round, index), Limit: 5,
+				ClaimedAt: claimedAt, LeaseUntil: claimedAt.Add(10 * time.Second),
+			})
+			if err != nil {
+				errorsFound <- err
+				return
+			}
+			outcomes <- claims
+		}(index)
+	}
+	group.Wait()
+	close(outcomes)
+	close(errorsFound)
+	for err := range errorsFound {
+		t.Fatalf("concurrent ClaimMatchmakingTickets() error = %v", err)
+	}
+	var claims []worker.TicketClaim
+	for batch := range outcomes {
+		claims = append(claims, batch...)
+	}
+	return claims
+}
+
+func processClaims(t *testing.T, ctx context.Context, processor *worker.MatchProcessor, claims []worker.TicketClaim, evaluatedAt time.Time) {
+	t.Helper()
+	errorsFound := make(chan error, len(claims))
+	var group sync.WaitGroup
+	for _, claim := range claims {
+		group.Add(1)
+		go func(claim worker.TicketClaim) {
+			defer group.Done()
+			if err := processor.Handle(ctx, claim, evaluatedAt); err != nil {
+				errorsFound <- err
+			}
+		}(claim)
+	}
+	group.Wait()
+	close(errorsFound)
+	for err := range errorsFound {
+		t.Fatalf("Handle(claim) error = %v", err)
+	}
+}
+
 func seedLifecycleConfig(t *testing.T, ctx context.Context, pool *pgxpool.Pool, modelVersion, policyVersion, tournamentID, tournamentVersion, roomID string, startedAt time.Time) {
 	t.Helper()
 	mustExec(t, ctx, pool,
@@ -181,7 +345,22 @@ func seedLifecycleConfig(t *testing.T, ctx context.Context, pool *pgxpool.Pool, 
 	)
 	mustExec(t, ctx, pool, `
 INSERT INTO matching_policies (policy_version, rating_model_version, definition, definition_digest)
-VALUES ($1, $2, '{}'::jsonb, $3)`, policyVersion, modelVersion, strings.Repeat("b", 64))
+VALUES (
+    $1,
+    $2,
+    '{
+        "initial_skill_gap": 100,
+        "max_skill_gap": 100,
+        "max_win_probability_spread": 1,
+        "expansion_interval_ms": 1000,
+        "fill_timeout_ms": 60000,
+        "age_priority_after_ms": 30000,
+        "candidate_limit": 100,
+        "room_limit": 100,
+        "prefer_nearly_full": true
+    }'::jsonb,
+    $3
+)`, policyVersion, modelVersion, strings.Repeat("b", 64))
 	mustExec(t, ctx, pool, `
 INSERT INTO tournament_configs (
     tournament_id, version, mode_id, capacity, entry_fee_minor, currency,
@@ -249,7 +428,7 @@ GROUP BY r.status`, roomID).Scan(&status, &members, &sessions); err != nil {
 SELECT count(*) FILTER (WHERE event_type = 'ticket.assigned'),
        count(*) FILTER (WHERE event_type = 'room.filled')
 FROM outbox_events
-WHERE event_id LIKE $1`, prefix+"%").Scan(&assignmentEvents, &filledEvents); err != nil {
+WHERE aggregate_id LIKE $1`, prefix+"%").Scan(&assignmentEvents, &filledEvents); err != nil {
 		t.Fatalf("read lifecycle outbox: %v", err)
 	}
 	if assignmentEvents != 5 || filledEvents != 1 {
