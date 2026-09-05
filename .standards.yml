@@ -1,0 +1,33 @@
+version: 1.4.0
+maturity: high-load-critical
+source: krav01/dev-standards
+public_ci_source: krav01/go-ci-standards@46c957083701ed4d041228babee6e5d32c944c0e
+
+controls:
+  reusable_ci: false
+  standards_drift: true
+  lint: true
+  vulncheck: true
+  race: true
+  database_integration: true
+  fuzz: project-specific
+  architecture_guard: project-specific
+  dependency_review: false
+  project_memory: true
+  memory_freshness: true
+  memory_hotspots: true
+  verification_cache: true
+  known_traps: true
+
+exceptions:
+  - control: reusable_ci
+    reason: Existing local CI is stricter and includes project-specific PostgreSQL integration and race coverage; replacing it would reduce project-specific assurance.
+    revisit: Re-evaluate when the public reusable workflow supports project-specific extension without duplicating heavy checks.
+  - control: dependency_review
+    reason: Not currently enforced by the main CI workflow.
+    revisit: Enable when repository settings and CI policy support it without duplicating existing checks.
+
+local_overrides:
+  - The project-specific AGENTS.md invariants take precedence over generic baseline guidance.
+  - PostgreSQL integration tests remain local because they model project-specific transactional and concurrency behavior.
+  - Existing project CI remains authoritative where it is stricter or more specific than the reusable baseline.
