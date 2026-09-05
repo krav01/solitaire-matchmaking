@@ -34,6 +34,9 @@ rating endpoints now expose lifecycle composition and the latest persisted,
 version-explicit player estimate for diagnostics and reconciliation. Authenticated
 Prometheus metrics, a Grafana dashboard and alert rules now cover fill speed,
 fairness guardrails, HTTP health and background-worker reliability.
+Deterministic resilience scenarios, a reviewed security posture, an immutable
+deployment procedure and a release checklist complete the Stage 6 release
+candidate.
 
 ## Architecture
 
@@ -58,6 +61,9 @@ See [project map](docs/project-map.md), [architecture decisions](docs/architectu
 [roadmap](docs/roadmap.md). Engineering controls are defined by the
 [Definition of Done](docs/definition-of-done.md), [testing strategy](docs/testing.md),
 [security model](docs/security.md), and [review checklist](docs/review-checklist.md).
+Production promotion follows the [deployment guide](docs/deployment.md),
+[security review](docs/security-review.md), and
+[release checklist](docs/release-checklist.md).
 
 ## Run locally
 
@@ -115,6 +121,10 @@ late, partial or identity-conflicting results are rejected.
 make check
 make security
 ```
+
+For a release candidate with `TEST_DATABASE_URL` pointing to a disposable
+PostgreSQL 18 database, run `make release-check`; it adds integration,
+resilience, container-build and non-root-image verification.
 
 The current API and outbound webhook are documented in
 [`api/openapi.yaml`](api/openapi.yaml). Retry rules and event payload fields are

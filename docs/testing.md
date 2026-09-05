@@ -87,15 +87,16 @@ Real evaluation must:
 
 ## CI gates
 
-The repository CI keeps independent jobs for:
+The repository CI enforces these gates:
 
 1. build and full race-enabled unit tests on pull requests/main;
-2. short fuzz smoke tests for hard matchmaking invariants;
-3. PostgreSQL integration tests;
-4. lint/static analysis;
-5. architecture dependency checks;
-6. reachable-vulnerability scanning;
-7. critical-path benchmark measurement on `main`.
+2. scratch-based container build and non-root runtime-user verification;
+3. short fuzz smoke tests for hard matchmaking invariants;
+4. PostgreSQL integration and resilience tests;
+5. lint/static analysis;
+6. architecture dependency checks;
+7. reachable-vulnerability scanning;
+8. critical-path benchmark measurement on `main`.
 
 GitHub Dependency Review is an additional PR gate for newly introduced vulnerable dependencies. Dependabot, `govulncheck`, and manual review remain complementary controls.
 

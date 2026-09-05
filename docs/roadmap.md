@@ -52,4 +52,4 @@
 - [x] complete room and rating query HTTP adapters
 - [x] observability dashboards and alerts for speed, fairness and reliability
 - [x] load, recovery and failure-injection scenarios
-- deployment guide, security review and release checklist
+- [x] deployment guide, security review and release checklist
