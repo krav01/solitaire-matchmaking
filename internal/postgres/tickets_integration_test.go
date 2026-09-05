@@ -189,6 +189,7 @@ func TestMatchmakingWorkerPostgreSQL(t *testing.T) {
 	if _, err := postgres.ApplyMigrations(ctx, pool); err != nil {
 		t.Fatalf("ApplyMigrations() error = %v", err)
 	}
+	mustExec(t, ctx, pool, "DELETE FROM matchmaking_tickets WHERE status = 'queued'")
 
 	prefix := fmt.Sprintf("worker-%d", time.Now().UnixNano())
 	modelVersion := prefix + "-model"
