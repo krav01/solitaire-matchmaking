@@ -64,4 +64,5 @@
       the game-backend receiver
 - [x] establish an initial private-pilot latency, queue, database and reliability
       SLO profile with recording rules, alerts and minimum evidence gates
-- [ ] evaluate the extended rating in shadow mode on time-ordered real outcomes
+- [x] implement isolated extended-rating shadow execution and paired reporting
+- [ ] collect the minimum time-ordered real-outcome window and approve/reject the candidate

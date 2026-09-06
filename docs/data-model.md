@@ -14,6 +14,11 @@ require validation against production traffic before release.
 | Session | room, ticket, player, seat | state, start/submission timestamps |
 | Verified result | unique event id, room/player/session, rules version | normalized optional features |
 | Rating update | player, source event, model version, before/after estimates | processing timestamp |
+| Shadow deployment | candidate/baseline versions, compatible mode/rules/deck, training boundary | activation interval |
+| Shadow timeline | room/result source identity and logical position | lease, retry, processed/skip state |
+| Shadow prediction | room and candidate version | immutable paired baseline/candidate distributions |
+| Shadow state | player, mode and candidate version | candidate estimate and prior-result feature profile |
+| Shadow observation | result and candidate version | paired holdout scores and stable segment |
 | Outbox event | event id, aggregate/version, event type, serialized payload | availability, lease, attempts, error, delivery time |
 
 Required integrity rules for stage 4:
@@ -66,6 +71,14 @@ tickets and never replaced by results from the room being matched. The rating
 worker claims the oldest available unprocessed result, blocks overtaking during
 leases or retries, and atomically writes immutable updates, current estimates,
 the processed marker and a `result.rated` outbox event.
+
+Shadow evaluation is physically isolated from the active rating tables. Room
+fill and result finalization append work to a globally ordered logical timeline.
+The room item snapshots paired pre-game predictions; the result item scores the
+pair and advances candidate-only state using features from that result. A room
+item wins a timestamp tie, so a result cannot influence its own prediction.
+Skipped items retain a bounded reason, and retries fence ownership with the same
+lease discipline as the baseline worker.
 
 The outbox worker claims due aggregate heads with `FOR UPDATE SKIP LOCKED` and
 releases row locks before HTTPS delivery. Events from independent aggregates are

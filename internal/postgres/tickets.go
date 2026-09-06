@@ -480,10 +480,27 @@ INSERT INTO sessions (
 	if err := insertAssignmentEvents(ctx, tx, command, assignment); err != nil {
 		return tournament.Assignment{}, err
 	}
+	if roomFilled {
+		if err := insertShadowWork(ctx, tx, "room", room.id, command.AssignedAt, 0); err != nil {
+			return tournament.Assignment{}, err
+		}
+	}
 	if err := tx.Commit(ctx); err != nil {
 		return tournament.Assignment{}, mapConflict(err, tournament.ErrAssignmentConflict, "commit ticket assignment")
 	}
 	return assignment, nil
+}
+
+func insertShadowWork(ctx context.Context, tx pgx.Tx, kind, sourceID string, timelinePosition time.Time, priority int) error {
+	_, err := tx.Exec(ctx, `
+INSERT INTO rating_shadow_work (
+    work_kind, source_id, timeline_position, ordering_priority, next_attempt_at
+) VALUES ($1, $2, $3, $4, $3)
+ON CONFLICT (work_kind, source_id) DO NOTHING`, kind, sourceID, timelinePosition, priority)
+	if err != nil {
+		return fmt.Errorf("insert rating shadow work: %w", err)
+	}
+	return nil
 }
 
 type storedTicket struct {

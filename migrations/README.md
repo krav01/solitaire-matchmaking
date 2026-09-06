@@ -30,5 +30,12 @@ cannot let a later outcome overtake it.
 used to preserve aggregate order while independent events are delivered in
 parallel.
 
+`000007_rating_shadow_mode` adds nullable room deck-version metadata plus an
+isolated, ordered shadow-evaluation timeline. Candidate deployments, pre-game
+paired predictions, player state, update history and scored observations are
+new tables; active rating rows and existing result-processing columns are not
+rewritten. Old binaries ignore the additive schema, and rooms without a deck
+version are recorded as skipped shadow work.
+
 Rollback uses a reviewed compensating forward migration. Destructive automatic
 down migrations are intentionally unsupported.

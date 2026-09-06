@@ -32,7 +32,7 @@ security:
 
 integration:
 	@test -n "$$TEST_DATABASE_URL" || { echo "TEST_DATABASE_URL is required" >&2; exit 1; }
-	$(GO) test -count=1 -run '^Test(MigrationsApplyToPostgreSQL|OutboxDeliveryPostgreSQL|TicketLifecyclePostgreSQL|MatchmakingWorkerPostgreSQL|ResultFinalizationPostgreSQL|RatingWorkerPostgreSQL|TournamentLifecyclePostgreSQLEndToEnd|OutboxResiliencePostgreSQL)$$' ./internal/postgres
+	$(GO) test -count=1 -run '^Test(MigrationsApplyToPostgreSQL|OutboxDeliveryPostgreSQL|TicketLifecyclePostgreSQL|MatchmakingWorkerPostgreSQL|ResultFinalizationPostgreSQL|RatingWorkerPostgreSQL|RatingShadowPostgreSQL.*|TournamentLifecyclePostgreSQLEndToEnd|OutboxResiliencePostgreSQL)$$' ./internal/postgres
 
 canary:
 	@test -n "$$CANARY_DATABASE_URL" || { echo "CANARY_DATABASE_URL is required" >&2; exit 1; }

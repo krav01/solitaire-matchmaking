@@ -8,7 +8,7 @@ topology.
 
 Deploy the immutable service image behind a private load balancer or ingress that
 terminates TLS. The service process exposes HTTP on `HTTP_ADDR`, runs the API and
-all four background workers, and connects directly to PostgreSQL. The game backend
+all five background workers, and connects directly to PostgreSQL. The game backend
 is the only intended business-API caller and the only outbound-event receiver.
 
 Multiple service replicas are supported by transactional claims, lease fencing,
@@ -69,7 +69,8 @@ The workflow publishes
 database job, or change an environment. Copy the immutable
 `ghcr.io/krav01/solitaire-matchmaking@sha256:...` reference from the workflow
 summary into the release record and deployment configuration. The runtime image
-contains only the statically linked `server` and `migrate` binaries plus CA
+contains only the statically linked `server`, `migrate` and `shadow-report`
+binaries plus CA
 certificates, and runs as numeric user and group `65532:65532`.
 
 After authenticating to GHCR when required, verify the signed provenance before
@@ -104,6 +105,39 @@ Attach the automated rehearsal report to the release record, then repeat the
 restore against the target environment's backup mechanism and representative
 data before promotion; synthetic CI evidence does not establish target RTO or
 PITR readiness.
+
+## Rating shadow rollout
+
+Migration `000007` is additive. Existing rooms keep a null `deck_version` and
+their shadow work is safely skipped. Before enabling a candidate, the trusted
+room/deck provisioning path must persist the immutable deck version on every new
+room. Do not infer it from the deck instance id.
+
+Register the candidate in `rating_models`, then insert one
+`rating_shadow_deployments` row in a reviewed operation. Its nested `candidate`
+definition must contain a complete `rating.ExtendedConfig`: explicit baseline
+parameters, feature schema, training-only means and standard deviations,
+coefficients, and a training horizon at or before the cutoff. The database
+rejects overlapping active deployments for the same mode/rules/deck context.
+End a run by setting `ended_at`; never rewrite its definition or training
+boundary after predictions exist.
+
+Monitor the `rating_shadow` worker and compare the age of the oldest unfinished
+timeline item with the pilot window. Generate evidence from the promoted image:
+
+```bash
+docker run --rm \
+  --read-only \
+  --user 65532:65532 \
+  --entrypoint /shadow-report \
+  --env DATABASE_URL \
+  --env RATING_SHADOW_COMPARISON_POLICY \
+  "$IMAGE" -candidate-version rating-extended-v1
+```
+
+Archive the JSON report with its deployment definition and observation window.
+An eligible report is evidence for a separate reviewed activation decision; the
+shadow worker and report command never change the active model.
 
 ## Rollout sequence
 

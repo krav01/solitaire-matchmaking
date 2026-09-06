@@ -51,3 +51,10 @@ instance so one exhausted pool is not hidden by healthy replicas.
 Histogram quantiles require enough observations in the selected window. Always
 read fill speed and both fairness ratios together and preserve mode, room-size,
 policy and model segmentation when investigating a regression.
+
+The worker families include `worker="rating_shadow"`. Successful cycles cover
+both persisted evidence and intentionally skipped work; inspect
+`rating_shadow_work.skip_reason` when the shadow worker is healthy but the
+observation count does not advance. Alert on sustained failures or an increasing
+age of the oldest unprocessed shadow item. Do not page the player-facing service
+for an isolated shadow backlog, because the candidate is non-authoritative.

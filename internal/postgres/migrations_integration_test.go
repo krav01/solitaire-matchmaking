@@ -53,6 +53,12 @@ func TestMigrationsApplyToPostgreSQL(t *testing.T) {
 		"sessions",
 		"verified_results",
 		"rating_updates",
+		"rating_shadow_deployments",
+		"rating_shadow_work",
+		"rating_shadow_predictions",
+		"rating_shadow_player_states",
+		"rating_shadow_updates",
+		"rating_shadow_observations",
 		"outbox_events",
 	} {
 		var exists bool

@@ -110,6 +110,8 @@ jobs:
         run: go test -count=1 -run '^TestMatchmakingWorkerPostgreSQL$' ./internal/postgres
       - name: Test time-ordered rating worker
         run: go test -count=1 -run '^TestRatingWorkerPostgreSQL$' ./internal/postgres
+      - name: Test isolated rating shadow timeline
+        run: go test -count=1 -run '^TestRatingShadowPostgreSQL.*$' ./internal/postgres
       - name: Test verified result finalization
         run: go test -count=1 -run '^TestResultFinalizationPostgreSQL$' ./internal/postgres
       - name: Test complete tournament lifecycle
