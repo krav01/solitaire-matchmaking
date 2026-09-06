@@ -89,6 +89,17 @@ func Run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	if err != nil {
 		return err
 	}
+	shadowQueue, err := postgres.NewRatingShadowQueue(pool)
+	if err != nil {
+		return err
+	}
+	shadowRunner, err := worker.NewRatingShadowRunner(shadowQueue, logger, worker.RatingShadowRunnerOptions{
+		LeaseDuration: cfg.RatingLease, PollInterval: cfg.RatingPollInterval,
+		FailureBackoff: cfg.RatingFailureBackoff, Observer: metrics,
+	})
+	if err != nil {
+		return err
+	}
 	matchQueue, err := postgres.NewMatchmakingQueue(pool)
 	if err != nil {
 		return err
@@ -130,7 +141,7 @@ func Run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	}
 	workerCtx, stopWorker := context.WithCancel(ctx)
 	var workers sync.WaitGroup
-	workers.Add(4)
+	workers.Add(5)
 	go func() {
 		defer workers.Done()
 		runner.Run(workerCtx)
@@ -142,6 +153,10 @@ func Run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	go func() {
 		defer workers.Done()
 		ratingRunner.Run(workerCtx)
+	}()
+	go func() {
+		defer workers.Done()
+		shadowRunner.Run(workerCtx)
 	}()
 	go func() {
 		defer workers.Done()

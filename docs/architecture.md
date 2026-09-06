@@ -104,3 +104,25 @@ spread. Also expose each fairness measure relative to its immutable hard policy
 limit so dashboards and alerts remain meaningful across policy versions. Metrics
 observe only successfully persisted decisions; stale claims and failed mutations
 cannot appear as completed rooms.
+
+## ADR-009: Serialize shadow evidence on logical event time
+
+**Status:** accepted.
+
+Store room-fill and result-availability work in one globally ordered PostgreSQL
+timeline, with room work ordered first on equal timestamps. Persist candidate
+predictions, state, updates and observations in dedicated tables and keep model
+activation outside the worker.
+
+Generating a candidate prediction after seeing a result creates direct leakage,
+while independently scheduled room and result workers can reorder the
+information available to an online candidate. One logical timeline makes the
+replay boundary explicit and testable. Dedicated tables make experimentation
+non-authoritative and allow pause, retry and reporting without changing
+player-facing behavior.
+
+The shadow worker is intentionally serial and one poisoned head blocks later
+shadow evidence until retry or operator intervention. This does not block
+matchmaking, result ingestion or baseline rating. Higher throughput would
+require proven-safe partitioning by independent player sets, which is deferred
+until measured volume justifies the added ordering complexity.

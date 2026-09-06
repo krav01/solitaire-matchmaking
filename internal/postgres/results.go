@@ -126,6 +126,9 @@ WHERE room_id = $1`, room.id, room.version, command.AcceptedAt); err != nil {
 	if err := insertRoomCompletedEvent(ctx, tx, result); err != nil {
 		return tournament.FinalizedResult{}, err
 	}
+	if err := insertShadowWork(ctx, tx, "result", command.EventID, command.AvailableAt, 1); err != nil {
+		return tournament.FinalizedResult{}, err
+	}
 	if err := tx.Commit(ctx); err != nil {
 		return tournament.FinalizedResult{}, mapConflict(err, tournament.ErrResultConflict, "commit result finalization")
 	}

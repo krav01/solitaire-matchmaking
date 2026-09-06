@@ -118,6 +118,50 @@ rollback target. Rollback consumes that target instead of allowing accidental
 version toggling. An integration adapter must persist the state and transition
 atomically before this contract is used in production.
 
+## Runtime shadow evaluation
+
+The PostgreSQL adapter runs an extended candidate without changing active
+matchmaking or the rating read API. A deployment is an explicit immutable tuple
+of baseline and candidate versions, mode, scoring-rules version, deck version,
+training cutoff, training horizon, feature schema, training statistics and
+weights. There are no runtime defaults for feature weights or statistics.
+
+Room fill and verified-result finalization append separate work items to one
+shadow timeline. Items are ordered by logical event time, with a room prediction
+before a result at the same timestamp. The worker therefore persists both
+baseline and candidate placement distributions from information available at
+room fill, then scores that pair only when the verified result becomes
+available. Candidate rating state and running feature profiles advance on the
+result-availability timeline; wall-clock worker delay is audit metadata and is
+never an input to later historical predictions.
+
+All candidate state lives in `rating_shadow_*` tables. In particular, the worker
+does not write `player_ratings`, `rating_updates`, matchmaking tickets, rooms or
+the active model version. Missing deck metadata or an absent deployment produces
+an auditable skipped work item rather than a guessed prediction. A candidate
+failure blocks only the ordered shadow timeline and is retried under a lease; it
+does not block baseline rating processing.
+
+The `cmd/shadow-report` command reconstructs paired observations from immutable
+predictions and verified outcomes, then calls the same segment-aware comparison
+contract used by activation. Comparison thresholds remain explicit operator
+input:
+
+```bash
+export RATING_SHADOW_COMPARISON_POLICY='{
+  "minimum_rooms_per_segment": 100,
+  "minimum_overall_brier_improvement": 0.01,
+  "maximum_segment_brier_regression": 0.005,
+  "maximum_segment_log_loss_regression": 0.005,
+  "maximum_segment_calibration_regression": 0.005
+}'
+go run ./cmd/shadow-report -candidate-version rating-extended-v1
+```
+
+The numbers above demonstrate the required JSON shape only. Production gates
+must be approved from pilot evidence. Generating an eligible report does not
+activate the candidate.
+
 ## Current limits
 
 - The approximation treats pairwise placement comparisons as independent.
@@ -128,3 +172,5 @@ atomically before this contract is used in production.
   reproducibility and expected learning behavior on synthetic data.
 - Production comparison thresholds and feature weights remain unset until real
   EasyWin outcomes are available; the placement-only baseline stays active.
+- Runtime shadow support creates evidence but does not itself satisfy the
+  minimum real-outcome observation window.
