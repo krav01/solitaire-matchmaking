@@ -445,7 +445,7 @@ WHERE candidate_version = $1`, candidateVersion).Scan(
 
 func validateShadowDeployment(deployment shadowDeployment, modeID, rulesVersion, deckVersion string) error {
 	config := deployment.definition.Candidate
-	if config.Baseline.Version != deployment.candidateVersion || config.TrainedThrough != deployment.trainedThrough ||
+	if config.Baseline.Version != deployment.candidateVersion || !config.TrainedThrough.Equal(deployment.trainedThrough) ||
 		config.FeatureSchema.ModeID != modeID || config.FeatureSchema.ScoringRulesVersion != rulesVersion ||
 		config.FeatureSchema.DeckVersion != deckVersion {
 		return fmt.Errorf("rating shadow deployment %q definition does not match its immutable metadata", deployment.candidateVersion)
