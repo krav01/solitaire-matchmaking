@@ -58,7 +58,8 @@
 
 - [x] automate scanned GHCR image publication with an SPDX SBOM and signed
       provenance for stable release tags
-- [ ] rehearse backup restore and migrations against representative data volume
+- [x] automate backup restore and zero-pending migration rehearsal against
+      representative synthetic operational data volume
 - [ ] validate one canary lifecycle and idempotent outbox delivery with the game
       backend
 - [ ] establish environment-specific latency, queue, database and reliability

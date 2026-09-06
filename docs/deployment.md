@@ -44,12 +44,14 @@ starts the workflow; publication proceeds only when the tag points to a commit
 contained in `main`. The workflow:
 
 1. runs `make release-check` with PostgreSQL 18;
-2. builds and checks the non-root image in a read-only-permission job;
-3. blocks publication on high or critical image vulnerabilities;
-4. generates an SPDX JSON SBOM and uploads checksummed release inputs;
-5. verifies those checksums in a separate privileged job and refuses to
+2. rehearses a checksummed backup, restore and zero-pending migration run against
+   100,000 representative rows per primary operational table;
+3. builds and checks the non-root image in a read-only-permission job;
+4. blocks publication on high or critical image vulnerabilities;
+5. generates an SPDX JSON SBOM and uploads checksummed release inputs;
+6. verifies those checksums in a separate privileged job and refuses to
    overwrite an existing GHCR version tag;
-6. pushes the image, records its registry digest, and publishes signed build
+7. pushes the image, records its registry digest, and publishes signed build
    provenance and SBOM attestations.
 
 Create a release tag only from a reviewed, green `main` commit:
@@ -97,6 +99,10 @@ Use a dedicated migration role with schema-change privileges. Give the runtime
 role only the table and sequence privileges required by the service. Migrations
 are checksummed and serialized by an advisory lock, but the rollout must still
 follow `docs/migration-safety.md` and have a verified backup/restore path.
+Attach the automated rehearsal report to the release record, then repeat the
+restore against the target environment's backup mechanism and representative
+data before promotion; synthetic CI evidence does not establish target RTO or
+PITR readiness.
 
 ## Rollout sequence
 

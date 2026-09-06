@@ -34,4 +34,34 @@ At minimum:
 - test application behavior against the migrated schema;
 - test critical uniqueness, fencing and transactional invariants.
 
+The `Backup and restore rehearsal` workflow and stable-tag release workflow run
+`make backup-restore-rehearsal` with PostgreSQL 18. The script:
+
+1. requires explicit confirmation and names ending in `_rehearsal` and `_restore`;
+2. creates both databases from a separate administrative connection;
+3. applies the embedded migration catalogue and inserts configurable synthetic
+   rating, queued-ticket and outbox volume;
+4. creates a compressed custom-format backup and restores it in one transaction;
+5. reruns the migration binary and requires zero pending migrations;
+6. compares deterministic data, migration-ledger, constraint, index, function and
+   trigger manifests before deleting both disposable databases.
+
+Run the same guard locally only against a disposable PostgreSQL server:
+
+```bash
+export ADMIN_DATABASE_URL='postgres://matchmaking:matchmaking@127.0.0.1:5432/postgres?sslmode=disable'
+export SOURCE_DATABASE_URL='postgres://matchmaking:matchmaking@127.0.0.1:5432/matchmaking_rehearsal?sslmode=disable'
+export RESTORE_DATABASE_URL='postgres://matchmaking:matchmaking@127.0.0.1:5432/matchmaking_restore?sslmode=disable'
+export SOURCE_DATABASE_NAME=matchmaking_rehearsal
+export RESTORE_DATABASE_NAME=matchmaking_restore
+export REHEARSAL_CONFIRM_DISPOSABLE=1
+export REHEARSAL_ROWS=100000
+make backup-restore-rehearsal
+```
+
+The generated Markdown report records dump size and SHA-256 plus dump, restore,
+post-restore migration and total durations. Synthetic CI evidence validates the
+procedure and current schema; it does not replace a target-environment restore,
+PITR test, lock observation or recovery-time measurement.
+
 A destructive cleanup belongs in a later release after readers/writers of the old shape are gone.

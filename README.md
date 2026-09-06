@@ -145,11 +145,18 @@ injection, container build, and non-root runtime-user verification. GitHub CI
 also runs fixed-work fuzzing, architecture boundaries, dependency review, and a
 critical matchmaking benchmark.
 
+Migration-sensitive changes and a weekly scheduled workflow additionally create
+100,000 representative rows in each primary operational table, make a PostgreSQL
+custom-format backup, restore it into a separate disposable database, rerun the
+migration binary, and compare data plus schema-object manifests. See the
+[migration safety guide](docs/migration-safety.md) for the guarded local command.
+
 A stable `vMAJOR.MINOR.PATCH` tag on a commit contained in `main` runs the
 [release workflow](.github/workflows/release.yml). It repeats the release gate,
-scans the image before publication, publishes it to GHCR, and records both build
-provenance and the SPDX SBOM as signed attestations. The workflow publishes
-artifacts only; deployment remains an explicit operator action.
+repeats the backup/restore rehearsal, scans the image before publication,
+publishes it to GHCR, and records both build provenance and the SPDX SBOM as
+signed attestations. The workflow publishes artifacts only; deployment remains
+an explicit operator action.
 
 ## Repository guide
 

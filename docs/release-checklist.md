@@ -30,8 +30,11 @@ the release record. An unchecked blocker stops promotion.
 ## Database and configuration
 
 - [ ] Backup and restore have been verified for the target database.
-- [ ] Migration was rehearsed against representative schema/data volume, including
-      lock duration, compatibility, and forward-recovery behavior.
+- [ ] The automated backup/restore rehearsal report is attached and its data plus
+      schema manifests match after a zero-pending migration run.
+- [ ] Migration was rehearsed against target-representative schema/data volume,
+      including lock duration, compatibility, forward-recovery behavior and
+      measured restore time; synthetic CI evidence is not substituted.
 - [ ] Migration and runtime database roles are separate and least-privileged.
 - [ ] Production PostgreSQL uses verified TLS; connection and storage capacity are
       sized for the total replica count.
@@ -62,7 +65,7 @@ the release record. An unchecked blocker stops promotion.
 ## Release record
 
 Record the release version, commit SHA, image digest, release workflow run and
-SBOM artifact, migration catalogue state, security review approval, deployment
-time, operator, canary evidence, and rollback decision. Production SLOs and
-performance claims require representative measurements; synthetic test results
-must not be substituted.
+SBOM artifact, backup/restore rehearsal report, migration catalogue state,
+security review approval, deployment time, operator, canary evidence, and
+rollback decision. Production SLOs and performance claims require representative
+measurements; synthetic test results must not be substituted.

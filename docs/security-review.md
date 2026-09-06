@@ -18,7 +18,7 @@ documents linked from the release checklist.
 | Authentication secrets | Pass | Inbound and outbound bearer tokens are validated, never logged, and must now be distinct |
 | HTTP boundary | Pass with deployment condition | Bodies and headers are bounded, timeouts are configured, comparisons are constant-time, and errors are generic; TLS and request-rate controls belong at the private ingress |
 | Outbound delivery | Pass | Remote clear-text HTTP and redirects are rejected; requests are authenticated, timeout-bounded, lease-fenced, retried, and idempotency-keyed |
-| Persistence | Pass with deployment condition | SQL is parameterized and critical transitions are transactional; production must use TLS, separate migration/runtime roles, backups, and restore testing |
+| Persistence | Pass with deployment condition | SQL is parameterized and critical transitions are transactional; CI and releases rehearse synthetic backup/restore plus migrations, while production must use TLS, separate migration/runtime roles, and target-environment recovery testing |
 | Concurrency and recovery | Pass | Work is bounded and cancellation-owned; duplicate claims, stale leases, process recovery, publisher failure, and ordered delivery are tested |
 | Matchmaking integrity | Pass | Selection uses immutable pre-game snapshots and cannot relax hard fairness, fee, room-size, or version boundaries |
 | Sensitive telemetry | Pass | Logs avoid credentials and metrics use bounded labels without player, ticket, room, event, or request identities |

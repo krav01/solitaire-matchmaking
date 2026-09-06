@@ -97,14 +97,17 @@ The repository CI enforces these gates:
 6. architecture dependency checks;
 7. reachable-vulnerability scanning;
 8. critical-path benchmark measurement on `main`.
+9. backup, restore and migration rehearsal for migration-sensitive changes and on
+   a weekly schedule.
 
 GitHub Dependency Review is an additional PR gate for newly introduced vulnerable dependencies. Dependabot, `govulncheck`, and manual review remain complementary controls.
 
-Stable release tags additionally repeat `make release-check` before any image is
-published. The release workflow scans the exact local image and generates its
-SBOM without publish permissions, verifies checksummed handoff artifacts in a
-separate job, rejects an existing version tag, publishes to GHCR, and attests
-the resulting immutable digest. It does not deploy the image.
+Stable release tags additionally repeat `make release-check` and the PostgreSQL
+recovery rehearsal before any image is published. The release workflow scans the
+exact local image and generates its SBOM without publish permissions, verifies
+checksummed handoff artifacts in a separate job, rejects an existing version
+tag, publishes to GHCR, and attests the resulting immutable digest. It does not
+deploy the image.
 
 This keeps correctness gates before merge while reserving comparative benchmark measurement for `main`.
 
