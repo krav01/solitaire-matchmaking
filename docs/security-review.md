@@ -23,7 +23,7 @@ documents linked from the release checklist.
 | Matchmaking integrity | Pass | Selection uses immutable pre-game snapshots and cannot relax hard fairness, fee, room-size, or version boundaries |
 | Sensitive telemetry | Pass | Logs avoid credentials and metrics use bounded labels without player, ticket, room, event, or request identities |
 | Container | Pass | The runtime is scratch-based, read-only compatible, and runs as `65532:65532`; CI builds and verifies that user |
-| Supply chain | Pass with release action | Go vulnerabilities, dependency changes, actions, and standards drift are checked; promote by immutable digest and scan/sign the final image |
+| Supply chain | Pass with release action | Go vulnerabilities, dependency changes, actions, and standards drift are checked; stable tags run the full release gate, isolate third-party scanners from publish permissions, verify checksummed release inputs, and produce signed attestations before operators promote the recorded digest |
 
 No unresolved high-severity repository finding remains in the reviewed scope.
 

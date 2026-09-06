@@ -38,18 +38,45 @@ example files is for loopback development only.
 
 ## Build and promotion
 
-From a clean, reviewed commit:
+The repository publishes release images through
+`.github/workflows/release.yml`. A push of a new stable `vMAJOR.MINOR.PATCH` tag
+starts the workflow; publication proceeds only when the tag points to a commit
+contained in `main`. The workflow:
+
+1. runs `make release-check` with PostgreSQL 18;
+2. builds and checks the non-root image in a read-only-permission job;
+3. blocks publication on high or critical image vulnerabilities;
+4. generates an SPDX JSON SBOM and uploads checksummed release inputs;
+5. verifies those checksums in a separate privileged job and refuses to
+   overwrite an existing GHCR version tag;
+6. pushes the image, records its registry digest, and publishes signed build
+   provenance and SBOM attestations.
+
+Create a release tag only from a reviewed, green `main` commit:
 
 ```bash
-make release-check
-docker tag solitaire-matchmaking:release-check "registry.example.com/solitaire-matchmaking:${GIT_SHA:?set GIT_SHA}"
-docker push "registry.example.com/solitaire-matchmaking:${GIT_SHA}"
+git switch main
+git pull --ff-only
+git tag -a v0.1.0 -m "solitaire-matchmaking v0.1.0"
+git push origin v0.1.0
 ```
 
-Record the resulting registry digest and deploy that digest, not a mutable tag.
-Generate an SBOM and run the registry's image scanner before promotion. The
-runtime image contains only the statically linked `server` and `migrate` binaries
-plus CA certificates, and runs as numeric user and group `65532:65532`.
+The workflow publishes
+`ghcr.io/krav01/solitaire-matchmaking:<version>` but does not deploy it, create a
+database job, or change an environment. Copy the immutable
+`ghcr.io/krav01/solitaire-matchmaking@sha256:...` reference from the workflow
+summary into the release record and deployment configuration. The runtime image
+contains only the statically linked `server` and `migrate` binaries plus CA
+certificates, and runs as numeric user and group `65532:65532`.
+
+After authenticating to GHCR when required, verify the signed provenance before
+promotion:
+
+```bash
+IMAGE=ghcr.io/krav01/solitaire-matchmaking@sha256:replace-with-recorded-digest
+gh attestation verify "oci://${IMAGE}" -R krav01/solitaire-matchmaking
+docker pull "${IMAGE}"
+```
 
 ## Database migration
 
@@ -57,7 +84,7 @@ Application startup never changes the schema. Run one migration job with the sam
 image before starting the new application revision:
 
 ```bash
-IMAGE=registry.example.com/solitaire-matchmaking@sha256:replace-with-promoted-digest
+IMAGE=ghcr.io/krav01/solitaire-matchmaking@sha256:replace-with-promoted-digest
 docker run --rm \
   --read-only \
   --user 65532:65532 \

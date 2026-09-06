@@ -24,7 +24,7 @@ accuracy.
 | Retry-safe commands | Stable idempotency identities for ticket acceptance, cancellation, and result finalization |
 | Reliable integration | Transactional outbox, per-aggregate ordering, capped retry delay, and at-least-once HTTPS delivery |
 | Governed rating changes | Versioned baseline and feature models, time-ordered holdout evaluation, segment checks, revision-fenced activation, and rollback |
-| Operable releases | Structured logs, bounded-cardinality Prometheus metrics, dashboards, alerts, resilience tests, security review, and a non-root scratch image |
+| Operable releases | Structured logs, bounded-cardinality Prometheus metrics, dashboards, alerts, resilience tests, security review, and tag-gated GHCR images with SBOM and Sigstore attestations |
 
 ## Architecture
 
@@ -145,6 +145,12 @@ injection, container build, and non-root runtime-user verification. GitHub CI
 also runs fixed-work fuzzing, architecture boundaries, dependency review, and a
 critical matchmaking benchmark.
 
+A stable `vMAJOR.MINOR.PATCH` tag on a commit contained in `main` runs the
+[release workflow](.github/workflows/release.yml). It repeats the release gate,
+scans the image before publication, publishes it to GHCR, and records both build
+provenance and the SPDX SBOM as signed attestations. The workflow publishes
+artifacts only; deployment remains an explicit operator action.
+
 ## Repository guide
 
 | Area | Location |
@@ -157,8 +163,8 @@ critical matchmaking benchmark.
 | Operations assets | [`deploy/observability`](deploy/observability), [`docs/deployment.md`](docs/deployment.md) |
 
 Start with the [project map](docs/project-map.md) for responsibilities and the
-[completed roadmap](docs/roadmap.md) for delivery history. Engineering controls
-are defined by the [Definition of Done](docs/definition-of-done.md),
+[delivery roadmap](docs/roadmap.md) for completed and pending stages.
+Engineering controls are defined by the [Definition of Done](docs/definition-of-done.md),
 [testing strategy](docs/testing.md), [security model](docs/security.md), and
 [release checklist](docs/release-checklist.md).
 

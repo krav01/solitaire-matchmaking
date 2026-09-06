@@ -55,8 +55,10 @@ Pull requests and release changes are checked with:
 - `golangci-lint`, including `gosec` and static analysis;
 - `govulncheck` for reachable Go vulnerabilities;
 - GitHub dependency review for newly introduced vulnerable dependencies;
-- Dependabot for Go modules and GitHub Actions updates.
-- a container build check that verifies the non-root runtime user.
+- Dependabot for Go modules and GitHub Actions updates;
+- a container build check that verifies the non-root runtime user;
+- stable-tag release validation, pre-push high/critical image scanning, an SPDX
+  SBOM, and signed provenance and SBOM attestations.
 
 New runtime dependencies require a clear reason. Prefer the standard library where it provides an adequate solution.
 

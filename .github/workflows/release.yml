@@ -1,0 +1,239 @@
+name: Release image
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions: {}
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    name: Validate release
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_DB: matchmaking_test
+          POSTGRES_USER: matchmaking
+          POSTGRES_PASSWORD: matchmaking
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U matchmaking -d matchmaking_test"
+          --health-interval 2s
+          --health-timeout 2s
+          --health-retries 15
+    env:
+      TEST_DATABASE_URL: postgres://matchmaking:matchmaking@127.0.0.1:5432/matchmaking_test?sslmode=disable
+    steps:
+      - name: Checkout tagged source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Validate stable release tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! "${GITHUB_REF_NAME}" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+            echo "::error::Release tags must use stable SemVer form vMAJOR.MINOR.PATCH"
+            exit 1
+          fi
+
+          tagged_commit=$(git rev-parse "${GITHUB_REF}^{commit}")
+          if ! git merge-base --is-ancestor "${tagged_commit}" refs/remotes/origin/main; then
+            echo "::error::Release tag must point to a commit contained in main"
+            exit 1
+          fi
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Run release gate
+        run: make release-check
+
+  verify_image:
+    name: Verify release image
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    outputs:
+      repository: ${{ steps.image.outputs.repository }}
+      version: ${{ steps.image.outputs.version }}
+      reference: ${{ steps.image.outputs.reference }}
+    env:
+      REGISTRY: ghcr.io
+    steps:
+      - name: Checkout tagged source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Resolve immutable release identity
+        id: image
+        shell: bash
+        run: |
+          set -euo pipefail
+          repository="${REGISTRY}/${GITHUB_REPOSITORY,,}"
+          version="${GITHUB_REF_NAME#v}"
+          reference="${repository}:${version}"
+          {
+            echo "repository=${repository}"
+            echo "version=${version}"
+            echo "reference=${reference}"
+          } >> "${GITHUB_OUTPUT}"
+      - name: Build release image
+        env:
+          IMAGE_REFERENCE: ${{ steps.image.outputs.reference }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker build \
+            --label "org.opencontainers.image.source=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}" \
+            --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
+            --label "org.opencontainers.image.version=${{ steps.image.outputs.version }}" \
+            --tag "${IMAGE_REFERENCE}" \
+            .
+          test "$(docker image inspect --format '{{.Config.User}}' "${IMAGE_REFERENCE}")" = "65532:65532"
+      - name: Scan release image
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ${{ steps.image.outputs.reference }}
+          scanners: vuln
+          vuln-type: os,library
+          severity: CRITICAL,HIGH
+          ignore-unfixed: false
+          format: table
+          exit-code: '1'
+          version: v0.70.0
+      - name: Generate release SBOM
+        uses: anchore/sbom-action@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26 # v0.24.2
+        with:
+          image: ${{ steps.image.outputs.reference }}
+          format: spdx-json
+          output-file: solitaire-matchmaking.spdx.json
+          upload-artifact: false
+          upload-release-assets: false
+      - name: Package verified release inputs
+        env:
+          IMAGE_REFERENCE: ${{ steps.image.outputs.reference }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker save "${IMAGE_REFERENCE}" | gzip -9 > solitaire-matchmaking-image.tar.gz
+          sha256sum \
+            solitaire-matchmaking-image.tar.gz \
+            solitaire-matchmaking.spdx.json \
+            > release-artifacts.sha256
+      - name: Upload verified release inputs
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: solitaire-matchmaking-${{ github.ref_name }}-release-inputs
+          path: |
+            solitaire-matchmaking-image.tar.gz
+            solitaire-matchmaking.spdx.json
+            release-artifacts.sha256
+          if-no-files-found: error
+          retention-days: 30
+
+  publish:
+    name: Publish verified image
+    needs: verify_image
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+    env:
+      IMAGE_REFERENCE: ${{ needs.verify_image.outputs.reference }}
+      IMAGE_REPOSITORY: ${{ needs.verify_image.outputs.repository }}
+    steps:
+      - name: Download verified release inputs
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: solitaire-matchmaking-${{ github.ref_name }}-release-inputs
+      - name: Verify and load release image
+        shell: bash
+        run: |
+          set -euo pipefail
+          sha256sum --check release-artifacts.sha256
+          gzip --decompress --stdout solitaire-matchmaking-image.tar.gz | docker load
+          test "$(docker image inspect --format '{{.Config.User}}' "${IMAGE_REFERENCE}")" = "65532:65532"
+      - name: Log in to GitHub Container Registry
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '%s' "${GHCR_TOKEN}" |
+            docker login ghcr.io --username "${GITHUB_ACTOR}" --password-stdin
+      - name: Reject an existing release tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          if docker manifest inspect "${IMAGE_REFERENCE}" >/dev/null 2>&1; then
+            echo "::error::Refusing to overwrite existing image ${IMAGE_REFERENCE}"
+            exit 1
+          fi
+      - name: Push release image
+        id: push
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker push "${IMAGE_REFERENCE}"
+          repository_digest=$(
+            docker image inspect --format '{{range .RepoDigests}}{{println .}}{{end}}' "${IMAGE_REFERENCE}" |
+              awk -v prefix="${IMAGE_REPOSITORY}@" 'index($0, prefix) == 1 { print; exit }'
+          )
+          digest=${repository_digest#*@}
+          if [[ ! "${digest}" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+            echo "::error::Registry did not return a valid immutable digest"
+            exit 1
+          fi
+          {
+            echo "digest=${digest}"
+            echo "immutable=${IMAGE_REPOSITORY}@${digest}"
+          } >> "${GITHUB_OUTPUT}"
+      - name: Attest build provenance
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-name: ${{ needs.verify_image.outputs.repository }}
+          subject-digest: ${{ steps.push.outputs.digest }}
+          push-to-registry: true
+          create-storage-record: false
+      - name: Attest SBOM
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-name: ${{ needs.verify_image.outputs.repository }}
+          subject-digest: ${{ steps.push.outputs.digest }}
+          sbom-path: solitaire-matchmaking.spdx.json
+          push-to-registry: true
+          create-storage-record: false
+      - name: Record immutable release
+        env:
+          IMMUTABLE_IMAGE: ${{ steps.push.outputs.immutable }}
+        shell: bash
+        run: |
+          {
+            echo "## Verified release image"
+            echo
+            echo "- Tag: \`${GITHUB_REF_NAME}\`"
+            echo "- Commit: \`${GITHUB_SHA}\`"
+            echo "- Image: \`${IMMUTABLE_IMAGE}\`"
+            echo "- SBOM: workflow artifact plus signed OCI attestation"
+            echo
+            echo "This workflow publishes artifacts only; deployment remains an explicit operator action."
+          } >> "${GITHUB_STEP_SUMMARY}"

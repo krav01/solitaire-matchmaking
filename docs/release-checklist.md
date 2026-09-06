@@ -6,7 +6,8 @@ the release record. An unchecked blocker stops promotion.
 ## Source and verification
 
 - [ ] Release commit is on `main`, reviewed, and all required GitHub checks pass.
-- [ ] `make release-check` passes against a disposable PostgreSQL 18 database.
+- [ ] The tag-triggered `Validate release` job passes `make release-check` against
+      its disposable PostgreSQL 18 database.
 - [ ] OpenAPI, integration contract, migrations, dashboards, alerts, and operator
       documentation match the release commit.
 - [ ] Security review has no unresolved high-severity finding; residual risks have
@@ -17,10 +18,13 @@ the release record. An unchecked blocker stops promotion.
 ## Artifact and supply chain
 
 - [ ] Server and migration binaries come from the same reviewed commit and image.
-- [ ] Final image runs as `65532:65532`, has an SBOM, passes image scanning, and is
-      signed or otherwise provenance-verified by the deployment platform.
-- [ ] Registry digest is recorded and the deployment references that digest rather
-      than a mutable tag.
+- [ ] The `Verify release image` job confirms user `65532:65532`, passes the
+      high/critical image scan, and uploads checksummed image and SPDX SBOM
+      inputs.
+- [ ] The `Publish verified image` job verifies those checksums and publishes
+      both build provenance and SBOM attestations for the pushed digest.
+- [ ] The GHCR digest from the release workflow summary is recorded and the
+      deployment references that digest rather than the version tag.
 - [ ] Go module and GitHub Actions dependency changes have been reviewed.
 
 ## Database and configuration
@@ -57,7 +61,8 @@ the release record. An unchecked blocker stops promotion.
 
 ## Release record
 
-Record the release version, commit SHA, image digest, migration catalogue state,
-CI run, security review approval, deployment time, operator, canary evidence, and
-rollback decision. Production SLOs and performance claims require representative
-measurements; synthetic test results must not be substituted.
+Record the release version, commit SHA, image digest, release workflow run and
+SBOM artifact, migration catalogue state, security review approval, deployment
+time, operator, canary evidence, and rollback decision. Production SLOs and
+performance claims require representative measurements; synthetic test results
+must not be substituted.
