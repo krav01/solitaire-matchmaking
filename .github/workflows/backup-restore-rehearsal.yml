@@ -1,0 +1,94 @@
+name: Backup and restore rehearsal
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/backup-restore-rehearsal.yml'
+      - 'Makefile'
+      - 'cmd/migrate/**'
+      - 'internal/postgres/migrations.go'
+      - 'migrations/**'
+      - 'scripts/rehearse-backup-restore.sh'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/backup-restore-rehearsal.yml'
+      - 'Makefile'
+      - 'cmd/migrate/**'
+      - 'internal/postgres/migrations.go'
+      - 'migrations/**'
+      - 'scripts/rehearse-backup-restore.sh'
+  schedule:
+    - cron: '17 3 * * 0'
+  workflow_dispatch:
+    inputs:
+      rows:
+        description: Rows per representative operational table
+        required: true
+        default: '100000'
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backup-restore-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rehearse:
+    name: Rehearse PostgreSQL recovery
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_DB: postgres
+          POSTGRES_USER: matchmaking
+          POSTGRES_PASSWORD: matchmaking
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U matchmaking -d postgres"
+          --health-interval 2s
+          --health-timeout 2s
+          --health-retries 15
+    env:
+      ADMIN_DATABASE_URL: postgres://matchmaking:matchmaking@127.0.0.1:5432/postgres?sslmode=disable
+      SOURCE_DATABASE_URL: postgres://matchmaking:matchmaking@127.0.0.1:5432/matchmaking_rehearsal?sslmode=disable
+      RESTORE_DATABASE_URL: postgres://matchmaking:matchmaking@127.0.0.1:5432/matchmaking_restore?sslmode=disable
+      SOURCE_DATABASE_NAME: matchmaking_rehearsal
+      RESTORE_DATABASE_NAME: matchmaking_restore
+      REHEARSAL_CONFIRM_DISPOSABLE: '1'
+      REHEARSAL_ROWS: ${{ inputs.rows || '100000' }}
+      REHEARSAL_REPORT: backup-restore-rehearsal.md
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Rehearse backup, restore and migrations
+        env:
+          POSTGRES_CLIENT_CONTAINER: ${{ job.services.postgres.id }}
+        run: make backup-restore-rehearsal
+      - name: Record rehearsal evidence
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f "${REHEARSAL_REPORT}" ]]; then
+            cat "${REHEARSAL_REPORT}" >> "${GITHUB_STEP_SUMMARY}"
+          fi
+      - name: Upload rehearsal evidence
+        if: success()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: backup-restore-rehearsal-${{ github.run_id }}-${{ github.run_attempt }}
+          path: backup-restore-rehearsal.md
+          if-no-files-found: error
+          retention-days: 30
