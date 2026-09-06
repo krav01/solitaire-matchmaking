@@ -62,6 +62,6 @@
       representative synthetic operational data volume
 - [x] automate one external canary lifecycle and idempotent outbox replay with
       the game-backend receiver
-- [ ] establish environment-specific latency, queue, database and reliability
-      SLOs
+- [x] establish an initial private-pilot latency, queue, database and reliability
+      SLO profile with recording rules, alerts and minimum evidence gates
 - [ ] evaluate the extended rating in shadow mode on time-ordered real outcomes

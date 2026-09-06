@@ -1,6 +1,7 @@
 package observability
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -31,6 +32,36 @@ type Metrics struct {
 	fairnessViolations         *prometheus.CounterVec
 	workerCycles               *prometheus.CounterVec
 	workerItems                *prometheus.CounterVec
+}
+
+// DatabasePoolStats is a bounded snapshot of PostgreSQL pool health. Values are
+// process-local and intentionally carry no database, host, or credential labels.
+type DatabasePoolStats struct {
+	AcquiredConnections  int32
+	IdleConnections      int32
+	TotalConnections     int32
+	MaxConnections       int32
+	AcquireCount         int64
+	AcquireDuration      time.Duration
+	CanceledAcquireCount int64
+	EmptyAcquireCount    int64
+	EmptyAcquireWait     time.Duration
+}
+
+// DatabasePoolStatsProvider returns a current PostgreSQL pool snapshot.
+type DatabasePoolStatsProvider func() DatabasePoolStats
+
+type databasePoolCollector struct {
+	provider                 DatabasePoolStatsProvider
+	acquiredConnections      *prometheus.Desc
+	idleConnections          *prometheus.Desc
+	totalConnections         *prometheus.Desc
+	maxConnections           *prometheus.Desc
+	acquireCount             *prometheus.Desc
+	acquireDuration          *prometheus.Desc
+	canceledAcquireCount     *prometheus.Desc
+	emptyAcquireCount        *prometheus.Desc
+	emptyAcquireWaitDuration *prometheus.Desc
 }
 
 func NewMetrics() (*Metrics, error) {
@@ -120,6 +151,19 @@ func NewMetrics() (*Metrics, error) {
 	return metrics, nil
 }
 
+// RegisterDatabasePool adds process-local PostgreSQL pool metrics to the
+// registry. The provider is evaluated only when Prometheus scrapes the process.
+func (metrics *Metrics) RegisterDatabasePool(provider DatabasePoolStatsProvider) error {
+	if metrics == nil || provider == nil {
+		return errors.New("database pool metrics provider is required")
+	}
+	if err := metrics.registry.Register(newDatabasePoolCollector(provider)); err != nil {
+		return fmt.Errorf("register database pool metrics: %w", err)
+	}
+
+	return nil
+}
+
 func (metrics *Metrics) Handler() http.Handler {
 	return promhttp.HandlerFor(metrics.registry, promhttp.HandlerOpts{EnableOpenMetrics: true})
 }
@@ -179,6 +223,87 @@ func (metrics *Metrics) ObserveMatch(observation worker.MatchObservation) {
 	if spread > observation.MaximumProbabilitySpread {
 		metrics.fairnessViolations.WithLabelValues("win_probability_spread").Inc()
 	}
+}
+
+func newDatabasePoolCollector(provider DatabasePoolStatsProvider) *databasePoolCollector {
+	descriptor := func(name, help string) *prometheus.Desc {
+		return prometheus.NewDesc(
+			prometheus.BuildFQName(metricNamespace, "database_pool", name), help, nil, nil,
+		)
+	}
+
+	return &databasePoolCollector{
+		provider: provider,
+		acquiredConnections: descriptor(
+			"acquired_connections", "PostgreSQL connections currently checked out from the pool.",
+		),
+		idleConnections: descriptor(
+			"idle_connections", "PostgreSQL connections currently idle in the pool.",
+		),
+		totalConnections: descriptor(
+			"total_connections", "PostgreSQL connections currently owned by the pool.",
+		),
+		maxConnections: descriptor(
+			"max_connections", "Configured maximum PostgreSQL connections for this process.",
+		),
+		acquireCount: descriptor(
+			"acquires_total", "Successful PostgreSQL pool acquisitions.",
+		),
+		acquireDuration: descriptor(
+			"acquire_duration_seconds_total", "Cumulative duration of successful PostgreSQL pool acquisitions.",
+		),
+		canceledAcquireCount: descriptor(
+			"canceled_acquires_total", "PostgreSQL pool acquisitions canceled by their context.",
+		),
+		emptyAcquireCount: descriptor(
+			"empty_acquires_total", "Successful acquisitions that waited because the PostgreSQL pool was empty.",
+		),
+		emptyAcquireWaitDuration: descriptor(
+			"empty_acquire_wait_seconds_total", "Cumulative wait for successful acquisitions while the PostgreSQL pool was empty.",
+		),
+	}
+}
+
+func (collector *databasePoolCollector) Describe(descriptions chan<- *prometheus.Desc) {
+	for _, description := range []*prometheus.Desc{
+		collector.acquiredConnections, collector.idleConnections, collector.totalConnections,
+		collector.maxConnections, collector.acquireCount, collector.acquireDuration,
+		collector.canceledAcquireCount, collector.emptyAcquireCount,
+		collector.emptyAcquireWaitDuration,
+	} {
+		descriptions <- description
+	}
+}
+
+func (collector *databasePoolCollector) Collect(metrics chan<- prometheus.Metric) {
+	stats := collector.provider()
+	metrics <- prometheus.MustNewConstMetric(
+		collector.acquiredConnections, prometheus.GaugeValue, float64(stats.AcquiredConnections),
+	)
+	metrics <- prometheus.MustNewConstMetric(
+		collector.idleConnections, prometheus.GaugeValue, float64(stats.IdleConnections),
+	)
+	metrics <- prometheus.MustNewConstMetric(
+		collector.totalConnections, prometheus.GaugeValue, float64(stats.TotalConnections),
+	)
+	metrics <- prometheus.MustNewConstMetric(
+		collector.maxConnections, prometheus.GaugeValue, float64(stats.MaxConnections),
+	)
+	metrics <- prometheus.MustNewConstMetric(
+		collector.acquireCount, prometheus.CounterValue, float64(stats.AcquireCount),
+	)
+	metrics <- prometheus.MustNewConstMetric(
+		collector.acquireDuration, prometheus.CounterValue, stats.AcquireDuration.Seconds(),
+	)
+	metrics <- prometheus.MustNewConstMetric(
+		collector.canceledAcquireCount, prometheus.CounterValue, float64(stats.CanceledAcquireCount),
+	)
+	metrics <- prometheus.MustNewConstMetric(
+		collector.emptyAcquireCount, prometheus.CounterValue, float64(stats.EmptyAcquireCount),
+	)
+	metrics <- prometheus.MustNewConstMetric(
+		collector.emptyAcquireWaitDuration, prometheus.CounterValue, stats.EmptyAcquireWait.Seconds(),
+	)
 }
 
 func addCounter(counter prometheus.Counter, value int) {

@@ -8,8 +8,8 @@ the release record. An unchecked blocker stops promotion.
 - [ ] Release commit is on `main`, reviewed, and all required GitHub checks pass.
 - [ ] The tag-triggered `Validate release` job passes `make release-check` against
       its disposable PostgreSQL 18 databases, including the external canary.
-- [ ] OpenAPI, integration contract, migrations, dashboards, alerts, and operator
-      documentation match the release commit.
+- [ ] OpenAPI, integration contract, migrations, dashboards, alerts, SLO profile,
+      and operator documentation match the release commit.
 - [ ] Security review has no unresolved high-severity finding; residual risks have
       an owner and an accepted deployment control.
 - [ ] No secret, production credential, private endpoint, or real customer data is
@@ -53,8 +53,11 @@ the release record. An unchecked blocker stops promotion.
 - [ ] An idempotent ticket lifecycle completes and its outbox events are accepted
       and deduplicated by the game backend.
 - [ ] Dashboard data is present and alert routing is tested.
-- [ ] Canary observation covers HTTP errors, worker failures, queue age, fill speed,
-      timeout ratio, and both fairness limits before full rollout.
+- [ ] Pilot SLO recording rules are loaded, minimum evidence is classified, and
+      any objective breach has an owner and rollout decision.
+- [ ] Canary observation covers HTTP errors and latency, worker failures, ticket
+      assignment, fill speed, timeout ratio, database-pool health, and both
+      fairness limits before full rollout.
 
 ## Rollback readiness
 

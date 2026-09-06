@@ -47,8 +47,9 @@ reachable by untrusted or independently managed callers.
 ### Synthetic capacity evidence
 
 The resilience suite proves correctness under bounded contention; it is not a
-capacity result. Define production SLOs and size the database only after sustained
-tests in a representative environment, as required by
+capacity result. The private-pilot SLO profile is an operating target rather than
+capacity evidence. Define wider-production SLOs and size the database only after
+sustained tests in that representative environment, as required by
 `docs/performance-budget.md`.
 
 ## Re-review triggers
