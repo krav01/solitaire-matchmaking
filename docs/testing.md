@@ -118,6 +118,12 @@ rating reads, the four worker loops and all expected outbox event types. It then
 replays one delivered event through the production publisher and requires the
 receiver side-effect count to remain unchanged.
 
+For local exploration, `make demo` creates that clean canary database in a
+disposable PostgreSQL 18 container on a dynamically assigned loopback port,
+runs the same lifecycle with verbose output, and removes the container on exit.
+Docker is the only additional requirement; no `.env` file or pre-created
+database is needed.
+
 This keeps correctness gates before merge while reserving comparative benchmark measurement for `main`.
 
 A failed gate should be fixed rather than bypassed with broad exclusions. Any necessary suppression must be narrow and documented.
