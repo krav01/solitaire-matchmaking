@@ -14,14 +14,14 @@ or stage status change.
 | Tournament | `internal/tournament` | Versioned ticket, result and deadline lifecycle contracts | Stage 4 complete |
 | Workers | `internal/worker` | Bounded matchmaking, deadline expiry, ordered rating and outbox delivery | Stage 4 workers implemented |
 | Event delivery | `internal/eventdelivery` | Authenticated, idempotent HTTPS publication to the game backend | Implemented |
-| Observability | `internal/observability`, `deploy/observability` | Structured logging, bounded Prometheus metrics, Grafana dashboard and alert rules | Operational baseline implemented |
+| Observability | `internal/observability`, `deploy/observability`, `docs/slo.md` | Structured logging, bounded Prometheus and PostgreSQL pool metrics, pilot SLO recording rules, Grafana dashboard and alerts | Stage 7 pilot SLO profile implemented |
 | Rating | `pkg/rating` | Baseline, versioned feature evaluation, model comparison and rollout contracts | Stage 5 complete; baseline active pending real evidence |
 | Matching | `pkg/matchmaking` | Bounded fair selection and deterministic retry scheduling | Stage 3 complete |
 | Current API | `api/openapi.yaml` | Machine-readable operational, ticket, room, rating, result and outbound event contracts | Integration surface implemented |
 | Integration | `docs/api-contract.md`, `examples/game-backend`, `.github/workflows/canary.yml` | API contract, event payload catalogue, retry rules, tested Go receiver and external canary lifecycle | Stage 7 synthetic canary validation implemented |
 | Persistence | `migrations` | Embedded schema including ticket, worker, result and outbox invariants | Stage 4 complete |
 | Engineering guardrails | `.github`, `CONTRIBUTING.md`, `SECURITY.md`, `scripts/check-architecture.sh`, `docs/definition-of-done.md`, `docs/resilience-testing.md` | Contribution and disclosure policy plus risk-based dependency, architecture, resilience, fuzz, race, lint and security checks | Enforced in CI |
-| Release operations | `.github/workflows/release.yml`, `.github/workflows/backup-restore-rehearsal.yml`, `.github/workflows/canary.yml`, `scripts/rehearse-backup-restore.sh`, `docs/deployment.md`, `docs/security-review.md`, `docs/release-checklist.md` | Tag-gated GHCR publication, backup/restore and canary rehearsals, pre-push image scanning, SBOM and provenance attestations, migration and rollback procedure | Stage 7 artifact, recovery and synthetic canary validation implemented; environment pilot pending |
+| Release operations | `.github/workflows/release.yml`, `.github/workflows/backup-restore-rehearsal.yml`, `.github/workflows/canary.yml`, `scripts/rehearse-backup-restore.sh`, `docs/deployment.md`, `docs/security-review.md`, `docs/release-checklist.md` | Tag-gated GHCR publication, backup/restore and canary rehearsals, pre-push image scanning, SBOM and provenance attestations, migration, SLO and rollback procedure | Stage 7 artifact, recovery, synthetic canary and pilot SLO validation implemented; real pilot evidence pending |
 
 ## Dependency direction
 

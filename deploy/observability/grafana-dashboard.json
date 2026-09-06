@@ -95,6 +95,84 @@
       }],
       "title": "HTTP server error ratio",
       "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "${datasource}"},
+      "fieldConfig": {"defaults": {"unit": "s"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 8, "x": 0, "y": 24},
+      "id": 8,
+      "targets": [{
+        "expr": "histogram_quantile(0.99, sum by (le) (rate(solitaire_matchmaking_http_request_duration_seconds_bucket{route=~\"/v1/.*\"}[10m])))",
+        "legendFormat": "business routes p99",
+        "refId": "A"
+      }],
+      "title": "HTTP business-route latency p99",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "${datasource}"},
+      "fieldConfig": {"defaults": {"unit": "s"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 8, "x": 8, "y": 24},
+      "id": 9,
+      "targets": [{
+        "expr": "histogram_quantile(0.95, sum by (le, mode, capacity, policy_version, rating_model_version) (rate(solitaire_matchmaking_matchmaking_ticket_assignment_seconds_bucket{mode=~\"$mode\",capacity=~\"$capacity\",policy_version=~\"$policy_version\",rating_model_version=~\"$rating_model_version\"}[15m])))",
+        "legendFormat": "{{mode}} / {{capacity}} / {{policy_version}} / {{rating_model_version}}",
+        "refId": "A"
+      }],
+      "title": "Ticket assignment latency p95",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "${datasource}"},
+      "fieldConfig": {"defaults": {"max": 1, "min": 0, "unit": "percentunit"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 8, "x": 16, "y": 24},
+      "id": 10,
+      "targets": [{
+        "expr": "sum(rate(solitaire_matchmaking_matchmaking_attempts_total{outcome=\"timed_out\"}[15m])) / clamp_min(sum(rate(solitaire_matchmaking_matchmaking_attempts_total{outcome=~\"matched|timed_out\"}[15m])), 0.001)",
+        "legendFormat": "timed-out terminal decisions",
+        "refId": "A"
+      }],
+      "title": "Matchmaking timeout ratio",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "${datasource}"},
+      "fieldConfig": {"defaults": {"max": 1, "min": 0, "unit": "percentunit"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 8, "x": 0, "y": 32},
+      "id": 11,
+      "targets": [{
+        "expr": "sum by (worker) (rate(solitaire_matchmaking_worker_items_total{outcome=\"failed\"}[10m])) / clamp_min(sum by (worker) (rate(solitaire_matchmaking_worker_items_total{outcome=~\"succeeded|failed\"}[10m])), 0.001)",
+        "legendFormat": "{{worker}}",
+        "refId": "A"
+      }],
+      "title": "Worker item failure ratio",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "${datasource}"},
+      "fieldConfig": {"defaults": {"max": 1, "min": 0, "unit": "percentunit"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 8, "x": 8, "y": 32},
+      "id": 12,
+      "targets": [{
+        "expr": "solitaire_matchmaking_database_pool_acquired_connections / clamp_min(solitaire_matchmaking_database_pool_max_connections, 1)",
+        "legendFormat": "{{instance}}",
+        "refId": "A"
+      }],
+      "title": "PostgreSQL pool utilization",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "${datasource}"},
+      "fieldConfig": {"defaults": {"unit": "s"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 8, "x": 16, "y": 32},
+      "id": 13,
+      "targets": [{
+        "expr": "sum(rate(solitaire_matchmaking_database_pool_acquire_duration_seconds_total[10m])) / clamp_min(sum(rate(solitaire_matchmaking_database_pool_acquires_total[10m])), 0.001)",
+        "legendFormat": "mean acquisition duration",
+        "refId": "A"
+      }],
+      "title": "PostgreSQL pool acquisition latency",
+      "type": "timeseries"
     }
   ],
   "refresh": "30s",
@@ -151,5 +229,5 @@
   "timezone": "browser",
   "title": "Solitaire Matchmaking Operations",
   "uid": "solitaire-matchmaking-operations",
-  "version": 1
+  "version": 2
 }

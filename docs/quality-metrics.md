@@ -36,7 +36,9 @@ are `1/5`, `1/6` and `1/7`. These are model checks, not production guarantees.
 - Training uses events available by the training cutoff; evaluation uses later events.
 - Compare each extended model with the placement-only baseline on the same evaluation set.
 - Accept a model only when the gain is stable across relevant segments and fill speed remains acceptable.
-- Set service-level objectives only after measuring arrival rates and tournament partitions.
+- Use the [private-pilot SLO profile](slo.md) as an operating target only after
+  its real-traffic minimum evidence is present. Wider-production objectives
+  require measured arrival rates and tournament partitions from that environment.
 
 ## Simulation report
 

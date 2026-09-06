@@ -49,6 +49,22 @@ func Run(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	if err != nil {
 		return err
 	}
+	if err := metrics.RegisterDatabasePool(func() observability.DatabasePoolStats {
+		stats := pool.Stat()
+		return observability.DatabasePoolStats{
+			AcquiredConnections:  stats.AcquiredConns(),
+			IdleConnections:      stats.IdleConns(),
+			TotalConnections:     stats.TotalConns(),
+			MaxConnections:       stats.MaxConns(),
+			AcquireCount:         stats.AcquireCount(),
+			AcquireDuration:      stats.AcquireDuration(),
+			CanceledAcquireCount: stats.CanceledAcquireCount(),
+			EmptyAcquireCount:    stats.EmptyAcquireCount(),
+			EmptyAcquireWait:     stats.EmptyAcquireWaitTime(),
+		}
+	}); err != nil {
+		return err
+	}
 	server, err := httpapi.New(pool, ticketService, resultService, queryStore, logger, httpapi.Options{
 		APIToken: cfg.APIToken, ReadinessTimeout: cfg.ReadinessTimeout, ShutdownTimeout: cfg.ShutdownTimeout,
 		Metrics: metrics,

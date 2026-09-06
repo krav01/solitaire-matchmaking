@@ -27,6 +27,7 @@ families:
 | `solitaire_matchmaking_matchmaking_room_win_probability_spread*` | Raw and hard-limit-relative predicted spread |
 | `solitaire_matchmaking_matchmaking_fairness_violations_total` | Defensive signal for a successful assignment outside hard limits |
 | `solitaire_matchmaking_worker_*` | Cycle health and claimed/succeeded/failed work by worker |
+| `solitaire_matchmaking_database_pool_*` | Process-local PostgreSQL pool capacity, acquisition count, cancellations and wait time |
 
 Room metrics are segmented by mode, capacity, policy version and rating-model
 version. Player, ticket, room, event and request identities are deliberately not
@@ -34,12 +35,18 @@ labels, which keeps cardinality bounded. HTTP observations use registered route
 patterns rather than raw paths for the same reason.
 
 Import [the Grafana dashboard](../deploy/observability/grafana-dashboard.json)
-and load [the Prometheus alert rules](../deploy/observability/prometheus-alerts.yaml).
-The fill warning measures p95 as a fraction of each policy's configured timeout;
-it does not invent a universal latency SLO. Tune its duration after observing
-representative production traffic. The one-percent HTTP error warning is also a
-starter threshold and must be reconciled with the production SLO. Fairness-limit violations are critical
-because successful room formation is not allowed to cross either hard boundary.
+and load the universal
+[Prometheus alert rules](../deploy/observability/prometheus-alerts.yaml). Load the
+[pilot SLO recording and alert rules](../deploy/observability/prometheus-slo-pilot.yaml)
+only in the private pilot environment. The exact pilot objectives, minimum
+sample sizes and release decisions are defined in the [SLO profile](slo.md).
+Production requires a separate profile based on its own representative evidence.
+
+The fill warning measures p95 as a fraction of each policy's configured timeout.
+Fairness-limit violations are critical because successful room formation is not
+allowed to cross either hard boundary. Database pool metrics are process-local;
+aggregate acquisition counters across replicas, but inspect saturation by
+instance so one exhausted pool is not hidden by healthy replicas.
 
 Histogram quantiles require enough observations in the selected window. Always
 read fill speed and both fairness ratios together and preserve mode, room-size,

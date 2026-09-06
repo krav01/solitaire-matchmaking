@@ -1,0 +1,231 @@
+groups:
+  - name: solitaire-matchmaking-pilot-slo
+    interval: 1m
+    rules:
+      - record: solitaire_matchmaking:slo_http_availability:ratio_28d
+        expr: |
+          1 - (
+            sum(rate(solitaire_matchmaking_http_requests_total{route=~"/v1/.*",status=~"5.."}[28d]))
+              / sum(rate(solitaire_matchmaking_http_requests_total{route=~"/v1/.*"}[28d]))
+          )
+        labels:
+          environment: pilot
+          objective: "0.999"
+
+      - record: solitaire_matchmaking:slo_http_latency:ratio_28d
+        expr: |
+          sum(rate(solitaire_matchmaking_http_request_duration_seconds_bucket{route=~"/v1/.*",le="0.5"}[28d]))
+            / sum(rate(solitaire_matchmaking_http_request_duration_seconds_count{route=~"/v1/.*"}[28d]))
+        labels:
+          environment: pilot
+          objective: "0.99"
+
+      - record: solitaire_matchmaking:slo_ticket_assignment_latency:ratio_28d
+        expr: |
+          sum by (mode, capacity, policy_version, rating_model_version) (
+            rate(solitaire_matchmaking_matchmaking_ticket_assignment_seconds_bucket{le="10"}[28d])
+          )
+            / sum by (mode, capacity, policy_version, rating_model_version) (
+              rate(solitaire_matchmaking_matchmaking_ticket_assignment_seconds_count[28d])
+            )
+        labels:
+          environment: pilot
+          objective: "0.95"
+
+      - record: solitaire_matchmaking:slo_room_fill_budget:ratio_28d
+        expr: |
+          sum by (mode, capacity, policy_version, rating_model_version) (
+            rate(solitaire_matchmaking_matchmaking_room_fill_timeout_ratio_bucket{le="0.9"}[28d])
+          )
+            / sum by (mode, capacity, policy_version, rating_model_version) (
+              rate(solitaire_matchmaking_matchmaking_room_fill_timeout_ratio_count[28d])
+            )
+        labels:
+          environment: pilot
+          objective: "0.95"
+
+      - record: solitaire_matchmaking:slo_match_completion:ratio_28d
+        expr: |
+          sum(rate(solitaire_matchmaking_matchmaking_attempts_total{outcome="matched"}[28d]))
+            / sum(rate(solitaire_matchmaking_matchmaking_attempts_total{outcome=~"matched|timed_out"}[28d]))
+        labels:
+          environment: pilot
+          objective: "0.99"
+
+      - record: solitaire_matchmaking:slo_worker_reliability:ratio_28d
+        expr: |
+          sum by (worker) (rate(solitaire_matchmaking_worker_items_total{outcome="succeeded"}[28d]))
+            / sum by (worker) (
+              rate(solitaire_matchmaking_worker_items_total{outcome=~"succeeded|failed"}[28d])
+            )
+        labels:
+          environment: pilot
+          objective: "0.995"
+
+      - record: solitaire_matchmaking:slo_database_acquisition:ratio_28d
+        expr: |
+          sum(rate(solitaire_matchmaking_database_pool_acquires_total[28d]))
+            / (
+              sum(rate(solitaire_matchmaking_database_pool_acquires_total[28d]))
+              + sum(rate(solitaire_matchmaking_database_pool_canceled_acquires_total[28d]))
+            )
+        labels:
+          environment: pilot
+          objective: "0.9999"
+
+  - name: solitaire-matchmaking-pilot-alerts
+    rules:
+      - alert: SolitaireMatchmakingFillTimeNearDeadline
+        expr: |
+          (
+            histogram_quantile(
+              0.95,
+              sum by (le, mode, capacity, policy_version, rating_model_version) (
+                rate(solitaire_matchmaking_matchmaking_room_fill_timeout_ratio_bucket[15m])
+              )
+            ) > 0.9
+          )
+          and on (mode, capacity, policy_version, rating_model_version)
+          sum by (mode, capacity, policy_version, rating_model_version) (
+            increase(solitaire_matchmaking_matchmaking_room_fill_timeout_ratio_count[15m])
+          ) >= 20
+        for: 15m
+        labels:
+          severity: warning
+          environment: pilot
+        annotations:
+          summary: Room fill p95 is consuming over 90% of its policy timeout
+          description: Inspect arrival rate, partition fragmentation and retry latency for the affected labels.
+
+      - alert: SolitaireMatchmakingHTTPServerErrors
+        expr: |
+          (
+            sum(rate(solitaire_matchmaking_http_requests_total{route=~"/v1/.*",status=~"5.."}[10m]))
+              / clamp_min(sum(rate(solitaire_matchmaking_http_requests_total{route=~"/v1/.*"}[10m])), 0.001)
+              > 0.005
+          )
+          and sum(increase(solitaire_matchmaking_http_requests_total{route=~"/v1/.*"}[10m])) >= 100
+        for: 10m
+        labels:
+          severity: warning
+          environment: pilot
+        annotations:
+          summary: Pilot HTTP availability error budget is burning rapidly
+          description: Business-route 5xx responses exceed the five-times burn threshold for the 99.9% pilot objective.
+
+      - alert: SolitaireMatchmakingHTTPLatencyHigh
+        expr: |
+          (
+            histogram_quantile(
+              0.99,
+              sum by (le) (
+                rate(solitaire_matchmaking_http_request_duration_seconds_bucket{route=~"/v1/.*"}[10m])
+              )
+            ) > 0.5
+          )
+          and sum(increase(solitaire_matchmaking_http_request_duration_seconds_count{route=~"/v1/.*"}[10m])) >= 100
+        for: 10m
+        labels:
+          severity: warning
+          environment: pilot
+        annotations:
+          summary: Pilot HTTP latency objective is breached
+          description: Business-route p99 latency exceeds 500 milliseconds with sufficient sample volume.
+
+      - alert: SolitaireMatchmakingTicketAssignmentSlow
+        expr: |
+          (
+            histogram_quantile(
+              0.95,
+              sum by (le, mode, capacity, policy_version, rating_model_version) (
+                rate(solitaire_matchmaking_matchmaking_ticket_assignment_seconds_bucket[15m])
+              )
+            ) > 10
+          )
+          and on (mode, capacity, policy_version, rating_model_version)
+          sum by (mode, capacity, policy_version, rating_model_version) (
+            increase(solitaire_matchmaking_matchmaking_ticket_assignment_seconds_count[15m])
+          ) >= 20
+        for: 15m
+        labels:
+          severity: warning
+          environment: pilot
+        annotations:
+          summary: Pilot ticket assignment latency objective is breached
+          description: Assignment p95 exceeds ten seconds for the affected policy and model segment.
+
+      - alert: SolitaireMatchmakingTimeoutBudgetBurn
+        expr: |
+          (
+            sum(rate(solitaire_matchmaking_matchmaking_attempts_total{outcome="timed_out"}[15m]))
+              / clamp_min(
+                sum(rate(solitaire_matchmaking_matchmaking_attempts_total{outcome=~"matched|timed_out"}[15m])),
+                0.001
+              ) > 0.05
+          )
+          and sum(increase(solitaire_matchmaking_matchmaking_attempts_total{outcome=~"matched|timed_out"}[15m])) >= 50
+        for: 15m
+        labels:
+          severity: warning
+          environment: pilot
+        annotations:
+          summary: Pilot matchmaking completion error budget is burning rapidly
+          description: Timed-out terminal decisions exceed the five-times burn threshold for the 99% pilot objective.
+
+      - alert: SolitaireMatchmakingWorkerFailureBudgetBurn
+        expr: |
+          (
+            sum by (worker) (rate(solitaire_matchmaking_worker_items_total{outcome="failed"}[10m]))
+              / clamp_min(
+                sum by (worker) (
+                  rate(solitaire_matchmaking_worker_items_total{outcome=~"succeeded|failed"}[10m])
+                ),
+                0.001
+              ) > 0.025
+          )
+          and on (worker)
+          sum by (worker) (
+            increase(solitaire_matchmaking_worker_items_total{outcome=~"succeeded|failed"}[10m])
+          ) >= 20
+        for: 10m
+        labels:
+          severity: warning
+          environment: pilot
+        annotations:
+          summary: Pilot worker reliability error budget is burning rapidly
+          description: Failed items exceed the five-times burn threshold for the 99.5% objective.
+
+      - alert: SolitaireMatchmakingDatabasePoolSaturated
+        expr: |
+          solitaire_matchmaking_database_pool_acquired_connections
+            / clamp_min(solitaire_matchmaking_database_pool_max_connections, 1)
+            > 0.8
+        for: 10m
+        labels:
+          severity: warning
+          environment: pilot
+        annotations:
+          summary: PostgreSQL pool utilization is sustained above 80 percent
+          description: Review query latency, replica connection budgets and DB_MAX_CONNS before increasing traffic.
+
+      - alert: SolitaireMatchmakingDatabaseAcquireBudgetBurn
+        expr: |
+          (
+            sum(rate(solitaire_matchmaking_database_pool_canceled_acquires_total[10m]))
+              / clamp_min(
+                sum(rate(solitaire_matchmaking_database_pool_acquires_total[10m]))
+                + sum(rate(solitaire_matchmaking_database_pool_canceled_acquires_total[10m])),
+                0.001
+              ) > 0.0005
+          )
+          and (
+            sum(increase(solitaire_matchmaking_database_pool_acquires_total[10m]))
+            + sum(increase(solitaire_matchmaking_database_pool_canceled_acquires_total[10m]))
+          ) >= 100
+        for: 10m
+        labels:
+          severity: warning
+          environment: pilot
+        annotations:
+          summary: Pilot PostgreSQL acquisition error budget is burning rapidly
+          description: Canceled pool acquisitions exceed the five-times burn threshold for the 99.99% objective.

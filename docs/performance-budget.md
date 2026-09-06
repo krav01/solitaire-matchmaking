@@ -30,9 +30,10 @@ Until a stable CI benchmark environment is available:
 - treat regressions above roughly 20% as a review trigger, not an automatic production SLO violation;
 - establish hard budgets only after repeated baseline measurements are stable.
 
-## Future production SLOs
+## Environment SLOs
 
-When representative traffic exists, define explicit budgets for:
+The initial private-pilot objectives are defined in [`docs/slo.md`](slo.md) and
+recorded by `deploy/observability/prometheus-slo-pilot.yaml`. They cover:
 
 - p50/p95/p99 request latency;
 - matchmaking queue wait time;
@@ -41,4 +42,6 @@ When representative traffic exists, define explicit budgets for:
 - DB query latency and pool saturation;
 - memory and goroutine growth under sustained load.
 
-Every production SLO must state workload, measurement window, and environment.
+Every wider-production SLO must still state workload, measurement window and
+environment, and must be recalibrated from that environment's representative
+evidence rather than copied from synthetic or pilot results.

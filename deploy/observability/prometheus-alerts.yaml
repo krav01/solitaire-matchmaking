@@ -18,21 +18,6 @@ groups:
           summary: A filled room exceeded a hard fairness limit
           description: Stop rollout and inspect the policy/model version before allowing further traffic.
 
-      - alert: SolitaireMatchmakingFillTimeNearDeadline
-        expr: |
-          histogram_quantile(
-            0.95,
-            sum by (le, mode, capacity, policy_version, rating_model_version) (
-              rate(solitaire_matchmaking_matchmaking_room_fill_timeout_ratio_bucket[15m])
-            )
-          ) > 0.9
-        for: 15m
-        labels:
-          severity: warning
-        annotations:
-          summary: Room fill p95 is consuming over 90% of its policy timeout
-          description: Inspect arrival rate, partition fragmentation and retry latency for the affected labels.
-
       - alert: SolitaireMatchmakingWorkerErrorsSustained
         expr: sum by (worker) (rate(solitaire_matchmaking_worker_cycles_total{result="error"}[5m])) > 0
         for: 10m
@@ -41,15 +26,3 @@ groups:
         annotations:
           summary: A background worker has sustained errors
           description: Inspect structured logs and retry state for the affected worker.
-
-      - alert: SolitaireMatchmakingHTTPServerErrors
-        expr: |
-          sum(rate(solitaire_matchmaking_http_requests_total{status=~"5.."}[5m]))
-            / clamp_min(sum(rate(solitaire_matchmaking_http_requests_total[5m])), 0.001)
-            > 0.01
-        for: 10m
-        labels:
-          severity: warning
-        annotations:
-          summary: HTTP 5xx responses exceed one percent
-          description: Inspect request IDs and structured service logs for the failing stable routes.

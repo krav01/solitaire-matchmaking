@@ -115,11 +115,13 @@ PITR readiness.
    and metrics.
 6. Exercise one idempotent ticket lifecycle and confirm outbox receipt and
    deduplication at the game backend.
-7. Watch error, worker-failure, queue-age, fill-speed, and fairness alerts before
-   increasing traffic or replicas.
+7. Load the private-pilot SLO recording rules, confirm their dashboard series,
+   and watch error-budget, worker-failure, database-pool, fill-speed and fairness
+   alerts before increasing traffic or replicas.
 8. Complete the rollout only while the canary remains healthy.
 
-The automated canary artifact is pre-release evidence that the complete software
+The exact pilot objectives and minimum evidence gates are defined in
+`docs/slo.md`. The automated canary artifact is pre-release evidence that the complete software
 path works against the example receiver. Repeat steps 5–7 through the target
 routing path and production game backend; the synthetic receiver and disposable
 database do not prove environment networking, durable receiver transactions,
@@ -133,10 +135,11 @@ then closes the database pool.
 ## Rollback
 
 Rollback the application to the previously promoted image digest when canary
-errors, worker failures, queue growth, or fairness alerts breach the agreed
-release threshold. Do not reverse a migration by editing the migration catalogue
-or deleting its history row. Forward-fix additive schema changes; destructive
-cleanup belongs to a later release after compatibility is proven.
+errors, worker failures, ticket-assignment latency, timeout, database-pool or
+fairness alerts breach the agreed release threshold. Do not reverse a migration
+by editing the migration catalogue or deleting its history row. Forward-fix
+additive schema changes; destructive cleanup belongs to a later release after
+compatibility is proven.
 
 An interrupted worker may leave leased work. Replacement replicas recover it
 after the lease expires; stale acknowledgements are fenced. Outbox delivery is at
