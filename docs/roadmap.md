@@ -60,8 +60,8 @@
       provenance for stable release tags
 - [x] automate backup restore and zero-pending migration rehearsal against
       representative synthetic operational data volume
-- [ ] validate one canary lifecycle and idempotent outbox delivery with the game
-      backend
+- [x] automate one external canary lifecycle and idempotent outbox replay with
+      the game-backend receiver
 - [ ] establish environment-specific latency, queue, database and reliability
       SLOs
 - [ ] evaluate the extended rating in shadow mode on time-ordered real outcomes
