@@ -129,9 +129,15 @@ database roles, migration order, canaries, and rollback.
 ## Verification
 
 ```bash
+make demo        # disposable PostgreSQL and complete five-player lifecycle
 make check       # tidy, build, race tests, lint
 make security    # reachable Go vulnerability scan
 ```
+
+`make demo` requires Docker. It starts a disposable PostgreSQL 18 container on
+an automatically selected loopback port, runs the real application and example
+game-backend receiver through the complete canary lifecycle, and removes the
+container on exit. No `.env` file or fixed local database port is required.
 
 For a release candidate, point `TEST_DATABASE_URL` at a disposable PostgreSQL 18
 database and run:
