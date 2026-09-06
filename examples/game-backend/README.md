@@ -39,3 +39,16 @@ curl --fail-with-body \
 
 Retry the exact logical result with the same `event_id`. The first accepted
 request returns 201; an identical replay returns 200 and `replay: true`.
+
+The repository's external canary test starts this receiver with the full service
+and all workers, then drives one five-player lifecycle through HTTP:
+
+```bash
+CANARY_DATABASE_URL='postgres://matchmaking:matchmaking@127.0.0.1:5432/matchmaking_canary?sslmode=disable' \
+  make canary
+```
+
+The database must be empty and its name must end in `_canary`. The test verifies
+the expected 13 event types and replays an already delivered event through the
+real publisher; the receiver must return success without applying its side
+effect again.

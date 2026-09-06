@@ -96,18 +96,27 @@ The repository CI enforces these gates:
 5. lint/static analysis;
 6. architecture dependency checks;
 7. reachable-vulnerability scanning;
-8. critical-path benchmark measurement on `main`.
+8. critical-path benchmark measurement on `main`;
 9. backup, restore and migration rehearsal for migration-sensitive changes and on
-   a weekly schedule.
+   a weekly schedule;
+10. external canary validation across the HTTP API, workers, PostgreSQL and the
+    game-backend receiver for integration-sensitive changes.
 
 GitHub Dependency Review is an additional PR gate for newly introduced vulnerable dependencies. Dependabot, `govulncheck`, and manual review remain complementary controls.
 
-Stable release tags additionally repeat `make release-check` and the PostgreSQL
-recovery rehearsal before any image is published. The release workflow scans the
-exact local image and generates its SBOM without publish permissions, verifies
-checksummed handoff artifacts in a separate job, rejects an existing version
-tag, publishes to GHCR, and attests the resulting immutable digest. It does not
-deploy the image.
+Stable release tags additionally repeat `make release-check`, including the
+external canary, and the PostgreSQL recovery rehearsal before any image is
+published. The release workflow scans the exact local image and generates its
+SBOM without publish permissions, verifies checksummed handoff artifacts in a
+separate job, rejects an existing version tag, publishes to GHCR, and attests the
+resulting immutable digest. It does not deploy the image.
+
+`make canary` requires a clean database whose name ends in `_canary`. It starts
+the actual application and example receiver, exercises health/readiness,
+authenticated capabilities and metrics, ticket and result idempotency, room and
+rating reads, the four worker loops and all expected outbox event types. It then
+replays one delivered event through the production publisher and requires the
+receiver side-effect count to remain unchanged.
 
 This keeps correctness gates before merge while reserving comparative benchmark measurement for `main`.
 

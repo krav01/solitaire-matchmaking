@@ -1,0 +1,107 @@
+name: Canary lifecycle
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/canary.yml'
+      - 'Makefile'
+      - 'api/openapi.yaml'
+      - 'cmd/server/**'
+      - 'examples/game-backend/**'
+      - 'go.mod'
+      - 'go.sum'
+      - 'internal/application/**'
+      - 'internal/config/**'
+      - 'internal/eventdelivery/**'
+      - 'internal/httpapi/**'
+      - 'internal/postgres/**'
+      - 'internal/tournament/**'
+      - 'internal/worker/**'
+      - 'migrations/**'
+      - 'pkg/matchmaking/**'
+      - 'pkg/rating/**'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/canary.yml'
+      - 'Makefile'
+      - 'api/openapi.yaml'
+      - 'cmd/server/**'
+      - 'examples/game-backend/**'
+      - 'go.mod'
+      - 'go.sum'
+      - 'internal/application/**'
+      - 'internal/config/**'
+      - 'internal/eventdelivery/**'
+      - 'internal/httpapi/**'
+      - 'internal/postgres/**'
+      - 'internal/tournament/**'
+      - 'internal/worker/**'
+      - 'migrations/**'
+      - 'pkg/matchmaking/**'
+      - 'pkg/rating/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: canary-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate external canary lifecycle
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_DB: matchmaking_canary
+          POSTGRES_USER: matchmaking
+          POSTGRES_PASSWORD: matchmaking
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U matchmaking -d matchmaking_canary"
+          --health-interval 2s
+          --health-timeout 2s
+          --health-retries 15
+    env:
+      CANARY_RUN: '1'
+      CANARY_DATABASE_URL: postgres://matchmaking:matchmaking@127.0.0.1:5432/matchmaking_canary?sslmode=disable
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Run external canary lifecycle
+        shell: bash
+        run: |
+          set -euo pipefail
+          go test -count=1 -v -run '^TestCanaryLifecycleWithGameBackend$' ./examples/game-backend |
+            tee canary-lifecycle.log
+      - name: Record canary evidence
+        shell: bash
+        run: |
+          {
+            echo "# Canary lifecycle"
+            echo
+            echo "- Result: PASS"
+            echo "- Commit: \`${GITHUB_SHA}\`"
+            echo "- API path: health, readiness, capabilities, tickets, room, result and ratings"
+            echo "- Game backend: 13 events applied; identical replay accepted without another side effect"
+          } >> "${GITHUB_STEP_SUMMARY}"
+      - name: Upload canary evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: canary-lifecycle-${{ github.run_id }}-${{ github.run_attempt }}
+          path: canary-lifecycle.log
+          if-no-files-found: error
+          retention-days: 30

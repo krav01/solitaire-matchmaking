@@ -7,7 +7,7 @@ the release record. An unchecked blocker stops promotion.
 
 - [ ] Release commit is on `main`, reviewed, and all required GitHub checks pass.
 - [ ] The tag-triggered `Validate release` job passes `make release-check` against
-      its disposable PostgreSQL 18 database.
+      its disposable PostgreSQL 18 databases, including the external canary.
 - [ ] OpenAPI, integration contract, migrations, dashboards, alerts, and operator
       documentation match the release commit.
 - [ ] Security review has no unresolved high-severity finding; residual risks have
@@ -46,6 +46,8 @@ the release record. An unchecked blocker stops promotion.
 ## Rollout and validation
 
 - [ ] Migration job completed successfully before the new application revision.
+- [ ] The automated canary artifact confirms the complete HTTP lifecycle, 13
+      expected outbox events and duplicate-delivery suppression for this commit.
 - [ ] Canary `/healthz`, `/readyz`, authenticated `/v1/capabilities`, and `/metrics`
       checks pass through the production routing path.
 - [ ] An idempotent ticket lifecycle completes and its outbox events are accepted

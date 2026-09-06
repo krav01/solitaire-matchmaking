@@ -141,9 +141,9 @@ make release-check
 ```
 
 That gate adds migrations, lifecycle integration, load/recovery/failure
-injection, container build, and non-root runtime-user verification. GitHub CI
-also runs fixed-work fuzzing, architecture boundaries, dependency review, and a
-critical matchmaking benchmark.
+injection, a complete external canary lifecycle, container build, and non-root
+runtime-user verification. GitHub CI also runs fixed-work fuzzing, architecture
+boundaries, dependency review, and a critical matchmaking benchmark.
 
 Migration-sensitive changes and a weekly scheduled workflow additionally create
 100,000 representative rows in each primary operational table, make a PostgreSQL
@@ -157,6 +157,12 @@ repeats the backup/restore rehearsal, scans the image before publication,
 publishes it to GHCR, and records both build provenance and the SPDX SBOM as
 signed attestations. The workflow publishes artifacts only; deployment remains
 an explicit operator action.
+
+The [canary workflow](.github/workflows/canary.yml) starts the real application
+and example game-backend receiver against a disposable PostgreSQL 18 database.
+It verifies health/readiness, authenticated capabilities and metrics, five
+ticket assignments, room completion, result replay, rating reads, all 13 expected
+outbox events, and receiver deduplication of an identical delivered event.
 
 ## Repository guide
 

@@ -18,10 +18,10 @@ or stage status change.
 | Rating | `pkg/rating` | Baseline, versioned feature evaluation, model comparison and rollout contracts | Stage 5 complete; baseline active pending real evidence |
 | Matching | `pkg/matchmaking` | Bounded fair selection and deterministic retry scheduling | Stage 3 complete |
 | Current API | `api/openapi.yaml` | Machine-readable operational, ticket, room, rating, result and outbound event contracts | Integration surface implemented |
-| Integration | `docs/api-contract.md`, `examples/game-backend` | API contract, event payload catalogue, retry rules and tested Go receiver | Stage 6 release candidate complete |
+| Integration | `docs/api-contract.md`, `examples/game-backend`, `.github/workflows/canary.yml` | API contract, event payload catalogue, retry rules, tested Go receiver and external canary lifecycle | Stage 7 synthetic canary validation implemented |
 | Persistence | `migrations` | Embedded schema including ticket, worker, result and outbox invariants | Stage 4 complete |
 | Engineering guardrails | `.github`, `CONTRIBUTING.md`, `SECURITY.md`, `scripts/check-architecture.sh`, `docs/definition-of-done.md`, `docs/resilience-testing.md` | Contribution and disclosure policy plus risk-based dependency, architecture, resilience, fuzz, race, lint and security checks | Enforced in CI |
-| Release operations | `.github/workflows/release.yml`, `.github/workflows/backup-restore-rehearsal.yml`, `scripts/rehearse-backup-restore.sh`, `docs/deployment.md`, `docs/security-review.md`, `docs/release-checklist.md` | Tag-gated GHCR publication, backup/restore rehearsal, pre-push image scanning, SBOM and provenance attestations, migration, canary and rollback procedure | Stage 7 artifact publishing and synthetic recovery rehearsal implemented; environment pilot pending |
+| Release operations | `.github/workflows/release.yml`, `.github/workflows/backup-restore-rehearsal.yml`, `.github/workflows/canary.yml`, `scripts/rehearse-backup-restore.sh`, `docs/deployment.md`, `docs/security-review.md`, `docs/release-checklist.md` | Tag-gated GHCR publication, backup/restore and canary rehearsals, pre-push image scanning, SBOM and provenance attestations, migration and rollback procedure | Stage 7 artifact, recovery and synthetic canary validation implemented; environment pilot pending |
 
 ## Dependency direction
 

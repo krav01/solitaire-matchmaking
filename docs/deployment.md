@@ -43,7 +43,8 @@ The repository publishes release images through
 starts the workflow; publication proceeds only when the tag points to a commit
 contained in `main`. The workflow:
 
-1. runs `make release-check` with PostgreSQL 18;
+1. runs `make release-check` with PostgreSQL 18, including the full external
+   canary lifecycle against a separate disposable database;
 2. rehearses a checksummed backup, restore and zero-pending migration run against
    100,000 representative rows per primary operational table;
 3. builds and checks the non-root image in a read-only-permission job;
@@ -117,6 +118,12 @@ PITR readiness.
 7. Watch error, worker-failure, queue-age, fill-speed, and fairness alerts before
    increasing traffic or replicas.
 8. Complete the rollout only while the canary remains healthy.
+
+The automated canary artifact is pre-release evidence that the complete software
+path works against the example receiver. Repeat steps 5–7 through the target
+routing path and production game backend; the synthetic receiver and disposable
+database do not prove environment networking, durable receiver transactions,
+alert routing or production capacity.
 
 Use `/healthz` for liveness and `/readyz` for readiness. Give shutdown at least
 `SHUTDOWN_TIMEOUT` plus platform scheduling margin. On termination the service
