@@ -53,3 +53,14 @@
 - [x] observability dashboards and alerts for speed, fairness and reliability
 - [x] load, recovery and failure-injection scenarios
 - [x] deployment guide, security review and release checklist
+
+## Stage 7 — Pilot and production evidence
+
+- [x] automate scanned GHCR image publication with an SPDX SBOM and signed
+      provenance for stable release tags
+- [ ] rehearse backup restore and migrations against representative data volume
+- [ ] validate one canary lifecycle and idempotent outbox delivery with the game
+      backend
+- [ ] establish environment-specific latency, queue, database and reliability
+      SLOs
+- [ ] evaluate the extended rating in shadow mode on time-ordered real outcomes
