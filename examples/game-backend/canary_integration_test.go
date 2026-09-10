@@ -163,6 +163,7 @@ func TestCanaryLifecycleWithGameBackend(t *testing.T) {
 		return status == http.StatusOK, requestErr
 	})
 	assertCanaryOperationalEndpoints(t, ctx, client, baseURL)
+	t.Log("demo: service ready; health, capabilities and metrics verified")
 
 	requestedAt := time.Now().UTC().Add(-time.Second).Truncate(time.Millisecond)
 	ticketIDs := make([]string, 5)
@@ -194,6 +195,7 @@ func TestCanaryLifecycleWithGameBackend(t *testing.T) {
 		}
 		ticketIDs[index] = accepted.Ticket.TicketID
 	}
+	t.Log("demo: five player tickets created")
 
 	var ticketReplay canaryTicketMutation
 	mustCanaryJSON(t, ctx, client, http.MethodPost, baseURL+"/v1/tickets", requestBodies[0], http.StatusOK, &ticketReplay)
@@ -240,6 +242,7 @@ func TestCanaryLifecycleWithGameBackend(t *testing.T) {
 	if collectingRoom.Status != "collecting" || len(collectingRoom.Members) != 5 {
 		t.Fatalf("collecting room = %+v", collectingRoom)
 	}
+	t.Logf("demo: room %s filled with five players", roomID)
 
 	finishedAt := time.Now().UTC().Truncate(time.Millisecond)
 	participants := make([]map[string]any, len(collectingRoom.Members))
@@ -280,6 +283,7 @@ func TestCanaryLifecycleWithGameBackend(t *testing.T) {
 	if !resultReplay.Replay {
 		t.Fatal("identical result retry was not reported as replay")
 	}
+	t.Log("demo: results submitted; idempotent replay verified")
 
 	waitForCanary(t, ctx, "room completion, ratings and outbox delivery", func() (bool, error) {
 		var delivered int
@@ -307,6 +311,7 @@ func TestCanaryLifecycleWithGameBackend(t *testing.T) {
 			t.Fatalf("player %d rating = %+v", index+1, current)
 		}
 	}
+	t.Log("demo: five updated ratings verified")
 
 	appliedBeforeReplay, eventTypes, replayEvent := recorder.snapshot()
 	wantTypes := map[string]int{
@@ -334,6 +339,7 @@ func TestCanaryLifecycleWithGameBackend(t *testing.T) {
 	if appliedAfterReplay != appliedBeforeReplay {
 		t.Fatalf("game-backend side effects after replay = %d, want %d", appliedAfterReplay, appliedBeforeReplay)
 	}
+	t.Logf("demo: game backend applied %d events and deduplicated the replay", appliedAfterReplay)
 
 	t.Logf(
 		"canary passed: room=%s tickets=5 ratings=5 events=%d ticket_replay=true result_replay=true outbox_replay_deduplicated=true duration=%s",
