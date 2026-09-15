@@ -166,7 +166,7 @@ func (runner *OutboxRunner) Run(ctx context.Context) {
 func (runner *OutboxRunner) RunOnce(ctx context.Context) (result OutboxRunResult, runErr error) {
 	defer func() {
 		runner.observer.ObserveWorkerCycle(WorkerCycleObservation{
-			Worker: runner.optionsObserverWorker(), Claimed: result.Claimed,
+			Worker: WorkerOutbox, Claimed: result.Claimed,
 			Succeeded: result.Delivered, DeadLettered: result.DeadLettered,
 			Failed: result.Failed, Errored: runErr != nil,
 		})
@@ -250,10 +250,6 @@ claimLoop:
 		combined = errors.Join(combined, claimErr)
 	}
 	return result, combined
-}
-
-func (runner *OutboxRunner) optionsObserverWorker() string {
-	return WorkerOutbox
 }
 
 func (runner *OutboxRunner) retryDelay(attempt int) time.Duration {
