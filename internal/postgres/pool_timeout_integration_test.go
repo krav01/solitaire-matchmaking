@@ -30,10 +30,10 @@ func TestOpenConfiguresDatabaseTimeouts(t *testing.T) {
 	if err := pool.QueryRow(ctx, "SHOW lock_timeout").Scan(&lockTimeout); err != nil {
 		t.Fatalf("SHOW lock_timeout: %v", err)
 	}
-	if statementTimeout != "5s" {
-		t.Fatalf("statement_timeout = %q, want 5s", statementTimeout)
+	if statementTimeout != "1500ms" {
+		t.Fatalf("statement_timeout = %q, want 1500ms", statementTimeout)
 	}
-	if lockTimeout != "1s" {
-		t.Fatalf("lock_timeout = %q, want 1s", lockTimeout)
+	if lockTimeout != "500ms" {
+		t.Fatalf("lock_timeout = %q, want 500ms", lockTimeout)
 	}
 }
