@@ -165,5 +165,5 @@ func (permanentPublisher) Publish(context.Context, OutboxEvent) error {
 
 type permanentTestError struct{}
 
-func (permanentTestError) Error() string    { return "permanent delivery failure" }
+func (permanentTestError) Error() string   { return "permanent delivery failure" }
 func (permanentTestError) Permanent() bool { return true }
