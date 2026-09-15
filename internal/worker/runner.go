@@ -97,10 +97,12 @@ func (runner *Runner) RunOnce(ctx context.Context) (result RunResult, runErr err
 	}()
 
 	now := runner.now().UTC()
-	claims, err := runner.queue.ClaimMatchmakingTickets(ctx, ClaimRequest{
+	claimCtx, cancelClaim := context.WithTimeout(ctx, leaseBoundedTimeout(runner.options.LeaseDuration))
+	claims, err := runner.queue.ClaimMatchmakingTickets(claimCtx, ClaimRequest{
 		Token: runner.token(), Limit: runner.options.BatchSize,
 		ClaimedAt: now, LeaseUntil: now.Add(runner.options.LeaseDuration),
 	})
+	cancelClaim()
 	if err != nil {
 		return RunResult{}, fmt.Errorf("claim matchmaking tickets: %w", err)
 	}
@@ -124,9 +126,13 @@ claimLoop:
 		go func(claim TicketClaim) {
 			defer group.Done()
 			defer func() { <-semaphore }()
-			if err := runner.handler.Handle(ctx, claim, now); err != nil {
+
+			remaining := claim.LeaseUntil.Sub(runner.now().UTC())
+			opCtx, cancel := context.WithTimeout(ctx, leaseBoundedTimeout(remaining))
+			defer cancel()
+			if err := runner.handler.Handle(opCtx, claim, now); err != nil {
 				retryAt := runner.now().UTC().Add(runner.options.FailureBackoff)
-				if retryErr := runner.queue.ScheduleTicketRetry(ctx, claim.Ticket.ID, claim.Token, retryAt); retryErr != nil &&
+				if retryErr := runner.queue.ScheduleTicketRetry(opCtx, claim.Ticket.ID, claim.Token, retryAt); retryErr != nil &&
 					!errors.Is(retryErr, tournament.ErrTicketClaimLost) {
 					err = errors.Join(err, fmt.Errorf("schedule failed claim: %w", retryErr))
 				}
