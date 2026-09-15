@@ -10,8 +10,8 @@ import (
 )
 
 const (
-	StatementTimeout = 5 * time.Second
-	LockTimeout      = time.Second
+	StatementTimeout = 1500 * time.Millisecond
+	LockTimeout      = 500 * time.Millisecond
 )
 
 // Open verifies connectivity before returning a pool. Errors intentionally omit
