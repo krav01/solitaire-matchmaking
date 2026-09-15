@@ -33,6 +33,19 @@ These values are engineering baselines only. They do not include HTTP, network l
 
 The PostgreSQL resilience suite separately exercises bounded concurrent outbox delivery, expired-lease recovery and publisher-failure retry. It validates correctness under contention and failure injection rather than claiming a production throughput number.
 
+## Reference baseline
+
+The first promoted main-branch baseline was recorded on 2026-09-15 at commit `5b17f2f9c728367fb331be7386ad15c4758707e7` by GitHub Actions using Go 1.26.6 on Ubuntu 24.04 (`linux/amd64`) with an Intel Xeon Platinum 8573C runner CPU.
+
+| Benchmark | Result | Allocations |
+| --- | --- | --- |
+| `BenchmarkSelectRoom-4` | `93,680 ns/op` | `106,664 B/op`, `204 allocs/op` |
+| `BenchmarkSimulation10000Tickets-4` | `286,329,312 ns/op`, `34,925 tickets/s` | `275,555,058 B/op`, `478,811 allocs/op` |
+
+The 34,925 tickets/second figure is in-memory simulation processing throughput for a deterministic synthetic workload. It is not HTTP RPS, database throughput, concurrent-user capacity, or a production SLO.
+
+Use this baseline for same-environment regression comparisons. Re-record it after material Go, runner-image, benchmark-workload, or hardware changes rather than comparing unlike environments.
+
 ## Rules
 
 - New critical-path code should include a benchmark when practical.
