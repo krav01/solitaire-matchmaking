@@ -7,11 +7,31 @@ Performance budgets are guardrails, not claims about production capacity. Baseli
 Track at minimum:
 
 - matchmaking room selection latency and allocations;
+- end-to-end deterministic matchmaking simulation throughput;
 - candidate filtering latency and allocations;
 - queue claim/lease throughput and contention;
 - PostgreSQL queries per ticket lifecycle transition;
 - worker queue wait and processing latency;
 - HTTP request p95/p99 latency once real traffic assumptions exist.
+
+## Reproducible local and CI profile
+
+Run:
+
+```bash
+make performance
+```
+
+The target measures two deterministic paths:
+
+- `BenchmarkSelectRoom` for the critical room-selection algorithm;
+- `BenchmarkSimulation10000Tickets` for a fixed 10,000-ticket synthetic workload generated at 250 arrivals/second with a stable seed and the baseline rating model.
+
+The simulation benchmark reports Go benchmark time and allocation metrics plus a custom `tickets/s` processing-throughput metric. It exercises the complete in-memory simulation policy/rating path over the same immutable workload on every iteration.
+
+These values are engineering baselines only. They do not include HTTP, network latency, PostgreSQL I/O, deployment topology, or real player traffic and therefore must not be presented as production RPS or capacity. Compare results on the same environment, Go version, commit and benchmark configuration.
+
+The PostgreSQL resilience suite separately exercises bounded concurrent outbox delivery, expired-lease recovery and publisher-failure retry. It validates correctness under contention and failure injection rather than claiming a production throughput number.
 
 ## Rules
 
@@ -23,12 +43,12 @@ Track at minimum:
 
 ## Initial benchmark policy
 
-Until a stable CI benchmark environment is available:
+The main-branch CI records the deterministic performance profile after each merge. Use its output as a reproducible reference point, not a production SLO.
 
-- run deterministic package benchmarks for critical algorithms;
-- record `ns/op`, `B/op`, and `allocs/op` in performance-sensitive PRs;
+- record `ns/op`, `B/op`, `allocs/op`, and simulation `tickets/s`;
 - treat regressions above roughly 20% as a review trigger, not an automatic production SLO violation;
-- establish hard budgets only after repeated baseline measurements are stable.
+- establish hard budgets only after repeated baseline measurements are stable;
+- record any promoted reference baseline with the commit, Go version, date and runner environment.
 
 ## Environment SLOs
 
