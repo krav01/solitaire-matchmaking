@@ -13,7 +13,7 @@ test:
 	$(GO) test -shuffle=on ./...
 
 race:
-	$(GO) test -race -shuffle=on ./...
+	TEST_DATABASE_URL= CANARY_DATABASE_URL= $(GO) test -race -shuffle=on ./...
 
 lint:
 	$(GOLANGCI_LINT) run ./...
@@ -32,7 +32,7 @@ security:
 
 integration:
 	@test -n "$$TEST_DATABASE_URL" || { echo "TEST_DATABASE_URL is required" >&2; exit 1; }
-	$(GO) test -count=1 -run '^Test(MigrationsApplyToPostgreSQL|OutboxDeliveryPostgreSQL|OutboxDeadLetterBlocksAggregateUntilRedrive|OpenConfiguresDatabaseTimeouts|TicketLifecyclePostgreSQL|MatchmakingWorkerPostgreSQL|ResultFinalizationPostgreSQL|RatingWorkerPostgreSQL|RatingShadowPostgreSQL.*|TournamentLifecyclePostgreSQLEndToEnd|OutboxResiliencePostgreSQL)$$' ./internal/postgres
+	$(GO) test -count=1 -parallel=1 -run '^Test(MigrationsApplyToPostgreSQL|OutboxDeliveryPostgreSQL|OutboxDeadLetterBlocksAggregateUntilRedrive|OpenConfiguresDatabaseTimeouts|TicketLifecyclePostgreSQL|MatchmakingWorkerPostgreSQL|ResultFinalizationPostgreSQL|RatingWorkerPostgreSQL|RatingShadowPostgreSQL.*|TournamentLifecyclePostgreSQLEndToEnd|OutboxResiliencePostgreSQL)$$' ./internal/postgres
 
 canary:
 	@test -n "$$CANARY_DATABASE_URL" || { echo "CANARY_DATABASE_URL is required" >&2; exit 1; }
