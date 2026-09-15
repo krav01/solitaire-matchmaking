@@ -5,11 +5,13 @@ on:
     paths:
       - '.github/workflows/release-artifact-smoke.yml'
       - '.release/smoke-image'
+      - '.release/smoke-revision'
   push:
     branches: [main]
     paths:
       - '.github/workflows/release-artifact-smoke.yml'
       - '.release/smoke-image'
+      - '.release/smoke-revision'
   workflow_dispatch:
 
 permissions:
@@ -22,7 +24,7 @@ concurrency:
 
 jobs:
   smoke:
-    name: Smoke published RC image
+    name: Smoke published release image
     runs-on: ubuntu-latest
     timeout-minutes: 10
     services:
@@ -50,21 +52,30 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Resolve immutable image
+      - name: Resolve immutable release identity
         id: image
         shell: bash
         run: |
           set -euo pipefail
           image=$(tr -d '[:space:]' < .release/smoke-image)
+          revision=$(tr -d '[:space:]' < .release/smoke-revision)
           if [[ ! "${image}" =~ ^ghcr\.io/krav01/solitaire-matchmaking@sha256:[0-9a-f]{64}$ ]]; then
             echo "::error::Smoke image must be the immutable solitaire-matchmaking GHCR digest"
             exit 1
           fi
-          echo "reference=${image}" >> "${GITHUB_OUTPUT}"
+          if [[ ! "${revision}" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::Smoke revision must be a full Git commit SHA"
+            exit 1
+          fi
+          {
+            echo "reference=${image}"
+            echo "revision=${revision}"
+          } >> "${GITHUB_OUTPUT}"
 
       - name: Pull and inspect published image
         env:
           IMAGE: ${{ steps.image.outputs.reference }}
+          EXPECTED_REVISION: ${{ steps.image.outputs.revision }}
         shell: bash
         run: |
           set -euo pipefail
@@ -74,7 +85,7 @@ jobs:
           revision=$(docker image inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "${IMAGE}")
           requested_version=$(tr -d '[:space:]' < .release/version)
           test "${version}" = "${requested_version#v}"
-          test "${revision}" = "789031d970066086d530fa1d0379de07a3e909f9"
+          test "${revision}" = "${EXPECTED_REVISION}"
 
       - name: Run published migration binary
         env:
@@ -113,6 +124,7 @@ jobs:
       - name: Probe published server
         env:
           IMAGE: ${{ steps.image.outputs.reference }}
+          EXPECTED_REVISION: ${{ steps.image.outputs.revision }}
         shell: bash
         run: |
           set -euo pipefail
@@ -147,6 +159,7 @@ jobs:
             echo
             echo "- Result: PASS"
             echo "- Image: \`${IMAGE}\`"
+            echo "- Revision: \`${EXPECTED_REVISION}\`"
             echo "- Runtime user: \`65532:65532\`"
             echo "- Migration binary: PASS"
             echo "- Hardened read-only server startup: PASS"
