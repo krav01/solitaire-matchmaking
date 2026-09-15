@@ -11,10 +11,10 @@ func TestLoadReturnsOrderedImmutableCatalog(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
 	}
-	if len(catalog) != 7 {
-		t.Fatalf("Load() count = %d, want 7", len(catalog))
+	if len(catalog) != 8 {
+		t.Fatalf("Load() count = %d, want 8", len(catalog))
 	}
-	wantNames := []string{"initial_schema", "ticket_lifecycle", "matchmaking_worker", "result_finalization", "rating_worker", "outbox_delivery", "rating_shadow_mode"}
+	wantNames := []string{"initial_schema", "ticket_lifecycle", "matchmaking_worker", "result_finalization", "rating_worker", "outbox_delivery", "rating_shadow_mode", "outbox_dead_letter"}
 	for index, migration := range catalog {
 		if migration.Version != int64(index+1) || migration.Name != wantNames[index] {
 			t.Fatalf("Load()[%d] = %+v", index, migration)
