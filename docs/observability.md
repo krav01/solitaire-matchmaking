@@ -26,7 +26,7 @@ families:
 | `solitaire_matchmaking_matchmaking_room_*gap*` | Raw and hard-limit-relative skill gap |
 | `solitaire_matchmaking_matchmaking_room_win_probability_spread*` | Raw and hard-limit-relative predicted spread |
 | `solitaire_matchmaking_matchmaking_fairness_violations_total` | Defensive signal for a successful assignment outside hard limits |
-| `solitaire_matchmaking_worker_*` | Cycle health and claimed/succeeded/failed work by worker |
+| `solitaire_matchmaking_worker_*` | Cycle health and claimed/succeeded/dead-lettered/failed work by worker |
 | `solitaire_matchmaking_database_pool_*` | Process-local PostgreSQL pool capacity, acquisition count, cancellations and wait time |
 
 Room metrics are segmented by mode, capacity, policy version and rating-model
@@ -51,6 +51,26 @@ instance so one exhausted pool is not hidden by healthy replicas.
 Histogram quantiles require enough observations in the selected window. Always
 read fill speed and both fairness ratios together and preserve mode, room-size,
 policy and model segmentation when investigating a regression.
+
+## Outbox dead letters
+
+A permanent delivery failure increments
+`solitaire_matchmaking_worker_items_total{worker="outbox",outcome="dead_lettered"}`
+and triggers `SolitaireMatchmakingOutboxDeadLettered`. A dead-lettered event is
+terminal for automatic delivery and intentionally remains an undelivered
+predecessor, so later events for the same aggregate cannot overtake it. Other
+aggregates continue to make progress.
+
+After the downstream contract or data issue is fixed, re-drive the exact event:
+
+```bash
+DATABASE_URL='postgres://...' go run ./cmd/outbox-redrive <event_id>
+```
+
+Re-drive clears the dead-letter state and schedules the event for normal claim
+and delivery. Do not clear dead-letter columns manually: the operator command
+preserves the ordering and claim invariants exercised by the PostgreSQL
+integration tests.
 
 The worker families include `worker="rating_shadow"`. Successful cycles cover
 both persisted evidence and intentionally skipped work; inspect

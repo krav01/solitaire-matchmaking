@@ -26,3 +26,11 @@ groups:
         annotations:
           summary: A background worker has sustained errors
           description: Inspect structured logs and retry state for the affected worker.
+
+      - alert: SolitaireMatchmakingOutboxDeadLettered
+        expr: increase(solitaire_matchmaking_worker_items_total{worker="outbox",outcome="dead_lettered"}[5m]) > 0
+        labels:
+          severity: critical
+        annotations:
+          summary: An outbox event entered the dead-letter state
+          description: Inspect the permanent delivery error, fix the downstream contract, then re-drive the blocked event before later events for the same aggregate can proceed.

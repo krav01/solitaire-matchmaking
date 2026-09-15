@@ -181,6 +181,7 @@ func (metrics *Metrics) ObserveWorkerCycle(observation worker.WorkerCycleObserva
 	metrics.workerCycles.WithLabelValues(observation.Worker, result).Inc()
 	addCounter(metrics.workerItems.WithLabelValues(observation.Worker, "claimed"), observation.Claimed)
 	addCounter(metrics.workerItems.WithLabelValues(observation.Worker, "succeeded"), observation.Succeeded)
+	addCounter(metrics.workerItems.WithLabelValues(observation.Worker, "dead_lettered"), observation.DeadLettered)
 	addCounter(metrics.workerItems.WithLabelValues(observation.Worker, "failed"), observation.Failed)
 }
 

@@ -104,6 +104,10 @@ jobs:
         run: go test -count=1 -run '^TestMigrationsApplyToPostgreSQL$' ./internal/postgres
       - name: Test retryable outbox delivery
         run: go test -count=1 -run '^TestOutboxDeliveryPostgreSQL$' ./internal/postgres
+      - name: Test dead-letter ordering and re-drive
+        run: go test -count=1 -run '^TestOutboxDeadLetterBlocksAggregateUntilRedrive$' ./internal/postgres
+      - name: Verify database session timeouts
+        run: go test -count=1 -run '^TestOpenConfiguresDatabaseTimeouts$' ./internal/postgres
       - name: Test transactional ticket lifecycle
         run: go test -count=1 -run '^TestTicketLifecyclePostgreSQL$' ./internal/postgres
       - name: Test concurrent matchmaking worker

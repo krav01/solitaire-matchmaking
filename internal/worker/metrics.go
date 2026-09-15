@@ -14,11 +14,12 @@ const (
 )
 
 type WorkerCycleObservation struct {
-	Worker    string
-	Claimed   int
-	Succeeded int
-	Failed    int
-	Errored   bool
+	Worker       string
+	Claimed      int
+	Succeeded    int
+	DeadLettered int
+	Failed       int
+	Errored      bool
 }
 
 type WorkerObserver interface {

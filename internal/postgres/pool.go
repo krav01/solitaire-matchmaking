@@ -9,6 +9,11 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+const (
+	StatementTimeout = 1500 * time.Millisecond
+	LockTimeout      = 500 * time.Millisecond
+)
+
 // Open verifies connectivity before returning a pool. Errors intentionally omit
 // the connection string: driver parse/connection errors may contain credentials.
 func Open(ctx context.Context, dsn string, maxConns int32) (*pgxpool.Pool, error) {
@@ -24,6 +29,8 @@ func Open(ctx context.Context, dsn string, maxConns int32) (*pgxpool.Pool, error
 	cfg.MaxConnLifetime = 30 * time.Minute
 	cfg.MaxConnIdleTime = 5 * time.Minute
 	cfg.ConnConfig.ConnectTimeout = 5 * time.Second
+	cfg.ConnConfig.RuntimeParams["statement_timeout"] = StatementTimeout.String()
+	cfg.ConnConfig.RuntimeParams["lock_timeout"] = LockTimeout.String()
 	pool, err := pgxpool.NewWithConfig(ctx, cfg)
 	if err != nil {
 		return nil, errors.New("cannot initialize PostgreSQL pool")
