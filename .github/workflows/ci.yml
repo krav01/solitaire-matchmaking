@@ -166,5 +166,5 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
-      - name: Measure matchmaking selection
-        run: go test -run '^$' -bench '^BenchmarkSelectRoom$' -benchmem -count=1 ./pkg/matchmaking
+      - name: Measure critical performance paths
+        run: make performance
