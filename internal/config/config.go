@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-const databaseStatementTimeout = 5 * time.Second
+const databaseStatementTimeout = 1500 * time.Millisecond
 
 type Config struct {
 	HTTPAddr             string
