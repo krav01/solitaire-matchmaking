@@ -33,6 +33,8 @@ func (err *PermanentDeliveryError) Error() string {
 	return fmt.Sprintf("delivery endpoint returned permanent HTTP %d", err.StatusCode)
 }
 
+func (err *PermanentDeliveryError) Permanent() bool { return true }
+
 func NewHTTPPublisher(endpoint, token string, timeout time.Duration) (*HTTPPublisher, error) {
 	if err := validateEndpoint(endpoint); err != nil {
 		return nil, err
