@@ -19,9 +19,7 @@ func TestOutboxRunnerBoundsConcurrencyAndRetriesFailures(t *testing.T) {
 	for index := range queue.claims {
 		queue.claims[index] = outboxClaim(string(rune('a'+index)), now, index+1)
 	}
-	publisher := &blockingPublisher{
-		started: make(chan struct{}, 5), release: make(chan struct{}), failEvent: "a",
-	}
+	publisher := &blockingPublisher{started: make(chan struct{}, 5), release: make(chan struct{}), failEvent: "a"}
 	observer := &workerObserverStub{}
 	runner, err := NewOutboxRunner(queue, publisher, slog.New(slog.NewTextHandler(io.Discard, nil)), OutboxRunnerOptions{
 		BatchSize: 5, Concurrency: 2, LeaseDuration: time.Minute,
@@ -58,10 +56,36 @@ func TestOutboxRunnerBoundsConcurrencyAndRetriesFailures(t *testing.T) {
 	if queue.retryEvent != "a" || !queue.retryAt.Equal(now.Add(time.Second)) || len(queue.delivered) != 4 {
 		t.Fatalf("queue retry = %q at %v, delivered = %v", queue.retryEvent, queue.retryAt, queue.delivered)
 	}
-	if observer.observation != (WorkerCycleObservation{
-		Worker: WorkerOutbox, Claimed: 5, Succeeded: 4, Failed: 1, Errored: true,
-	}) {
+	if observer.observation != (WorkerCycleObservation{Worker: WorkerOutbox, Claimed: 5, Succeeded: 4, Failed: 1, Errored: true}) {
 		t.Fatalf("worker observation = %+v", observer.observation)
+	}
+}
+
+func TestOutboxRunnerDeadLettersPermanentFailure(t *testing.T) {
+	t.Parallel()
+
+	now := time.Date(2026, time.September, 5, 6, 0, 0, 0, time.UTC)
+	queue := &outboxQueueStub{claims: []OutboxClaim{outboxClaim("a", now, 1)}}
+	publisher := permanentPublisher{}
+	runner, err := NewOutboxRunner(queue, publisher, slog.New(slog.NewTextHandler(io.Discard, nil)), OutboxRunnerOptions{
+		BatchSize: 1, Concurrency: 1, LeaseDuration: time.Minute,
+		PollInterval: time.Second, RetryBaseDelay: time.Second, RetryMaxDelay: time.Minute,
+	})
+	if err != nil {
+		t.Fatalf("NewOutboxRunner() error = %v", err)
+	}
+	runner.now = func() time.Time { return now }
+	runner.token = func() string { return "claim" }
+
+	result, err := runner.RunOnce(context.Background())
+	if err != nil {
+		t.Fatalf("RunOnce() error = %v", err)
+	}
+	if result != (OutboxRunResult{Claimed: 1, DeadLettered: 1}) {
+		t.Fatalf("RunOnce() = %+v", result)
+	}
+	if queue.deadLetterEvent != "a" || queue.retryEvent != "" {
+		t.Fatalf("dead letter = %q, retry = %q", queue.deadLetterEvent, queue.retryEvent)
 	}
 }
 
@@ -78,21 +102,18 @@ func TestOutboxRunnerCapsExponentialRetry(t *testing.T) {
 
 func outboxClaim(eventID string, now time.Time, attempt int) OutboxClaim {
 	return OutboxClaim{
-		Event: OutboxEvent{
-			EventID: eventID, AggregateType: "room", AggregateID: "room-" + eventID,
-			AggregateVersion: 1, EventType: "room.completed",
-			Payload: json.RawMessage(`{"room_id":"room-` + eventID + `"}`), OccurredAt: now.Add(-time.Minute),
-		},
+		Event: OutboxEvent{EventID: eventID, AggregateType: "room", AggregateID: "room-" + eventID, AggregateVersion: 1, EventType: "room.completed", Payload: json.RawMessage(`{"room_id":"room-` + eventID + `"}`), OccurredAt: now.Add(-time.Minute)},
 		Token: "claim", Attempt: attempt, LeaseUntil: now.Add(time.Minute),
 	}
 }
 
 type outboxQueueStub struct {
-	claims     []OutboxClaim
-	mutex      sync.Mutex
-	delivered  []string
-	retryEvent string
-	retryAt    time.Time
+	claims          []OutboxClaim
+	mutex           sync.Mutex
+	delivered       []string
+	retryEvent      string
+	retryAt         time.Time
+	deadLetterEvent string
 }
 
 func (queue *outboxQueueStub) ClaimOutboxEvents(context.Context, OutboxClaimRequest) ([]OutboxClaim, error) {
@@ -102,15 +123,20 @@ func (queue *outboxQueueStub) ClaimOutboxEvents(context.Context, OutboxClaimRequ
 func (queue *outboxQueueStub) MarkOutboxDelivered(_ context.Context, eventID, _ string, _ time.Time) error {
 	queue.mutex.Lock()
 	defer queue.mutex.Unlock()
-
 	queue.delivered = append(queue.delivered, eventID)
+	return nil
+}
+
+func (queue *outboxQueueStub) MarkOutboxDeadLettered(_ context.Context, eventID, _ string, _ time.Time, _ string) error {
+	queue.mutex.Lock()
+	defer queue.mutex.Unlock()
+	queue.deadLetterEvent = eventID
 	return nil
 }
 
 func (queue *outboxQueueStub) ScheduleOutboxRetry(_ context.Context, eventID, _ string, retryAt time.Time, _ string) error {
 	queue.mutex.Lock()
 	defer queue.mutex.Unlock()
-
 	queue.retryEvent = eventID
 	queue.retryAt = retryAt
 	return nil
@@ -128,6 +154,16 @@ func (publisher *blockingPublisher) Publish(_ context.Context, event OutboxEvent
 	if event.EventID == publisher.failEvent {
 		return errors.New("synthetic delivery failure")
 	}
-
 	return nil
 }
+
+type permanentPublisher struct{}
+
+func (permanentPublisher) Publish(context.Context, OutboxEvent) error {
+	return permanentTestError{}
+}
+
+type permanentTestError struct{}
+
+func (permanentTestError) Error() string    { return "permanent delivery failure" }
+func (permanentTestError) Permanent() bool { return true }
