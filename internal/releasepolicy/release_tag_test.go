@@ -18,6 +18,7 @@ func TestReleaseTagPolicy(t *testing.T) {
 		tag := tag
 		t.Run("accept_"+tag, func(t *testing.T) {
 			t.Parallel()
+			// #nosec G204 -- test-only fixed executable/script; tag is passed as a data argument, not shell-interpolated.
 			if output, err := exec.Command("bash", "../../scripts/validate-release-tag.sh", tag).CombinedOutput(); err != nil {
 				t.Fatalf("expected %q to be accepted: %v: %s", tag, err, output)
 			}
@@ -37,6 +38,7 @@ func TestReleaseTagPolicy(t *testing.T) {
 		tag := tag
 		t.Run("reject_"+tag, func(t *testing.T) {
 			t.Parallel()
+			// #nosec G204 -- test-only fixed executable/script; tag is passed as a data argument, not shell-interpolated.
 			if err := exec.Command("bash", "../../scripts/validate-release-tag.sh", tag).Run(); err == nil {
 				t.Fatalf("expected %q to be rejected", tag)
 			}
