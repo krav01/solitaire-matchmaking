@@ -138,6 +138,30 @@ WHERE event_id = $1
 	return nil
 }
 
+func (queue *OutboxQueue) RedriveOutboxDeadLetter(ctx context.Context, eventID string, availableAt time.Time) error {
+	if eventID == "" || availableAt.IsZero() {
+		return errors.New("event and re-drive time are required")
+	}
+	command, err := queue.pool.Exec(ctx, `
+UPDATE outbox_events
+SET dead_lettered_at = NULL,
+    dead_letter_reason = NULL,
+    last_error = NULL,
+    available_at = $2,
+    claimed_by = NULL,
+    claimed_until = NULL
+WHERE event_id = $1
+  AND delivered_at IS NULL
+  AND dead_lettered_at IS NOT NULL`, eventID, availableAt)
+	if err != nil {
+		return fmt.Errorf("re-drive outbox dead-letter: %w", err)
+	}
+	if command.RowsAffected() != 1 {
+		return errors.New("outbox dead-letter event not found")
+	}
+	return nil
+}
+
 func (queue *OutboxQueue) ScheduleOutboxRetry(ctx context.Context, eventID, claimToken string, retryAt time.Time, lastError string) error {
 	if eventID == "" || claimToken == "" || retryAt.IsZero() || lastError == "" {
 		return errors.New("event, claim, retry time and delivery error are required")
