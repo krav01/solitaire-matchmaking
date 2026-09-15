@@ -38,7 +38,6 @@ func (event OutboxEvent) Validate() error {
 	if !json.Valid(event.Payload) || len(event.Payload) == 0 || event.Payload[0] != '{' {
 		return errors.New("outbox event payload must be a JSON object")
 	}
-
 	return nil
 }
 
@@ -56,7 +55,6 @@ func (request OutboxClaimRequest) Validate() error {
 	if request.ClaimedAt.IsZero() || !request.LeaseUntil.After(request.ClaimedAt) {
 		return errors.New("outbox claim requires a positive lease")
 	}
-
 	return nil
 }
 
@@ -74,18 +72,22 @@ func (claim OutboxClaim) Validate() error {
 	if claim.Token == "" || claim.Attempt <= 0 || claim.LeaseUntil.IsZero() {
 		return errors.New("outbox claim is incomplete")
 	}
-
 	return nil
 }
 
 type OutboxQueue interface {
 	ClaimOutboxEvents(context.Context, OutboxClaimRequest) ([]OutboxClaim, error)
 	MarkOutboxDelivered(context.Context, string, string, time.Time) error
+	MarkOutboxDeadLettered(context.Context, string, string, time.Time, string) error
 	ScheduleOutboxRetry(context.Context, string, string, time.Time, string) error
 }
 
 type OutboxPublisher interface {
 	Publish(context.Context, OutboxEvent) error
+}
+
+type permanentDeliveryFailure interface {
+	Permanent() bool
 }
 
 type OutboxRunnerOptions struct {
@@ -114,14 +116,14 @@ func (options OutboxRunnerOptions) Validate() error {
 	if options.RetryBaseDelay <= 0 || options.RetryMaxDelay < options.RetryBaseDelay || options.RetryMaxDelay > time.Hour {
 		return errors.New("outbox retry delays are invalid")
 	}
-
 	return nil
 }
 
 type OutboxRunResult struct {
-	Claimed   int
-	Delivered int
-	Failed    int
+	Claimed      int
+	Delivered    int
+	DeadLettered int
+	Failed       int
 }
 
 type OutboxRunner struct {
@@ -141,17 +143,12 @@ func NewOutboxRunner(queue OutboxQueue, publisher OutboxPublisher, logger *slog.
 	if err := options.Validate(); err != nil {
 		return nil, err
 	}
-
-	return &OutboxRunner{
-		queue: queue, publisher: publisher, logger: logger, options: options,
-		observer: configuredWorkerObserver(options.Observer), now: time.Now, token: rand.Text,
-	}, nil
+	return &OutboxRunner{queue: queue, publisher: publisher, logger: logger, options: options, observer: configuredWorkerObserver(options.Observer), now: time.Now, token: rand.Text}, nil
 }
 
 func (runner *OutboxRunner) Run(ctx context.Context) {
 	timer := time.NewTimer(0)
 	defer timer.Stop()
-
 	for {
 		select {
 		case <-ctx.Done():
@@ -159,7 +156,7 @@ func (runner *OutboxRunner) Run(ctx context.Context) {
 		case <-timer.C:
 			result, err := runner.RunOnce(ctx)
 			if err != nil {
-				runner.logger.WarnContext(ctx, "outbox delivery cycle failed", "claimed", result.Claimed, "failed", result.Failed, "error", err)
+				runner.logger.WarnContext(ctx, "outbox delivery cycle failed", "claimed", result.Claimed, "failed", result.Failed, "dead_lettered", result.DeadLettered, "error", err)
 			}
 			timer.Reset(runner.options.PollInterval)
 		}
@@ -168,22 +165,16 @@ func (runner *OutboxRunner) Run(ctx context.Context) {
 
 func (runner *OutboxRunner) RunOnce(ctx context.Context) (result OutboxRunResult, runErr error) {
 	defer func() {
-		runner.observer.ObserveWorkerCycle(WorkerCycleObservation{
-			Worker: WorkerOutbox, Claimed: result.Claimed,
-			Succeeded: result.Delivered, Failed: result.Failed,
-			Errored: runErr != nil,
-		})
+		runner.observer.ObserveWorkerCycle(WorkerCycleObservation{Worker: WorkerOutbox, Claimed: result.Claimed, Succeeded: result.Delivered, Failed: result.Failed, Errored: runErr != nil})
 	}()
 
 	claimedAt := runner.now().UTC()
-	claims, err := runner.queue.ClaimOutboxEvents(ctx, OutboxClaimRequest{
-		Token: runner.token(), Limit: runner.options.BatchSize,
-		ClaimedAt: claimedAt, LeaseUntil: claimedAt.Add(runner.options.LeaseDuration),
-	})
+	claimCtx, cancelClaim := context.WithTimeout(ctx, leaseBoundedTimeout(runner.options.LeaseDuration))
+	claims, err := runner.queue.ClaimOutboxEvents(claimCtx, OutboxClaimRequest{Token: runner.token(), Limit: runner.options.BatchSize, ClaimedAt: claimedAt, LeaseUntil: claimedAt.Add(runner.options.LeaseDuration)})
+	cancelClaim()
 	if err != nil {
 		return OutboxRunResult{}, fmt.Errorf("claim outbox events: %w", err)
 	}
-
 	result = OutboxRunResult{Claimed: len(claims)}
 	if len(claims) == 0 {
 		return result, nil
@@ -192,6 +183,7 @@ func (runner *OutboxRunner) RunOnce(ctx context.Context) (result OutboxRunResult
 	semaphore := make(chan struct{}, runner.options.Concurrency)
 	errorsByClaim := make(chan error, len(claims))
 	delivered := make(chan struct{}, len(claims))
+	deadLettered := make(chan struct{}, len(claims))
 	var group sync.WaitGroup
 
 claimLoop:
@@ -202,17 +194,27 @@ claimLoop:
 			break claimLoop
 		case semaphore <- struct{}{}:
 		}
-
 		group.Add(1)
 		go func(claim OutboxClaim) {
 			defer group.Done()
 			defer func() { <-semaphore }()
+			remaining := claim.LeaseUntil.Sub(runner.now().UTC())
+			opCtx, cancel := context.WithTimeout(ctx, leaseBoundedTimeout(remaining))
+			defer cancel()
 
-			if publishErr := runner.publisher.Publish(ctx, claim.Event); publishErr != nil {
+			if publishErr := runner.publisher.Publish(opCtx, claim.Event); publishErr != nil {
+				if isPermanentDeliveryFailure(publishErr) {
+					deadAt := runner.now().UTC()
+					if err := runner.queue.MarkOutboxDeadLettered(opCtx, claim.Event.EventID, claim.Token, deadAt, boundedDeliveryError(publishErr)); err != nil {
+						errorsByClaim <- fmt.Errorf("dead-letter event %q: %w", claim.Event.EventID, err)
+						return
+					}
+					runner.logger.ErrorContext(opCtx, "outbox event dead-lettered", "event_id", claim.Event.EventID, "error", publishErr)
+					deadLettered <- struct{}{}
+					return
+				}
 				retryAt := runner.now().UTC().Add(runner.retryDelay(claim.Attempt))
-				retryErr := runner.queue.ScheduleOutboxRetry(
-					ctx, claim.Event.EventID, claim.Token, retryAt, boundedDeliveryError(publishErr),
-				)
+				retryErr := runner.queue.ScheduleOutboxRetry(opCtx, claim.Event.EventID, claim.Token, retryAt, boundedDeliveryError(publishErr))
 				if retryErr != nil && !errors.Is(retryErr, ErrOutboxClaimLost) {
 					publishErr = errors.Join(publishErr, fmt.Errorf("schedule outbox retry: %w", retryErr))
 				}
@@ -220,12 +222,10 @@ claimLoop:
 				return
 			}
 
-			deliveredAt := runner.now().UTC()
-			if err := runner.queue.MarkOutboxDelivered(ctx, claim.Event.EventID, claim.Token, deliveredAt); err != nil {
+			if err := runner.queue.MarkOutboxDelivered(opCtx, claim.Event.EventID, claim.Token, runner.now().UTC()); err != nil {
 				errorsByClaim <- fmt.Errorf("acknowledge event %q: %w", claim.Event.EventID, err)
 				return
 			}
-
 			delivered <- struct{}{}
 		}(claim)
 	}
@@ -233,17 +233,18 @@ claimLoop:
 	group.Wait()
 	close(errorsByClaim)
 	close(delivered)
-
+	close(deadLettered)
 	for range delivered {
 		result.Delivered++
 	}
-
+	for range deadLettered {
+		result.DeadLettered++
+	}
 	var combined error
 	for claimErr := range errorsByClaim {
 		result.Failed++
 		combined = errors.Join(combined, claimErr)
 	}
-
 	return result, combined
 }
 
@@ -255,8 +256,26 @@ func (runner *OutboxRunner) retryDelay(attempt int) time.Duration {
 		}
 		delay *= 2
 	}
-
 	return min(delay, runner.options.RetryMaxDelay)
+}
+
+func leaseBoundedTimeout(lease time.Duration) time.Duration {
+	if lease <= 0 {
+		return time.Nanosecond
+	}
+	margin := lease / 10
+	if margin > time.Second {
+		margin = time.Second
+	}
+	if margin <= 0 || lease <= margin {
+		return lease
+	}
+	return lease - margin
+}
+
+func isPermanentDeliveryFailure(err error) bool {
+	var permanent permanentDeliveryFailure
+	return errors.As(err, &permanent) && permanent.Permanent()
 }
 
 func boundedDeliveryError(err error) string {
@@ -264,6 +283,5 @@ func boundedDeliveryError(err error) string {
 	if len(message) > maxDeliveryError {
 		message = message[:maxDeliveryError]
 	}
-
 	return string(message)
 }

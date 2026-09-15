@@ -23,7 +23,6 @@ func NewOutboxQueue(pool *pgxpool.Pool) (*OutboxQueue, error) {
 	if pool == nil {
 		return nil, errors.New("PostgreSQL pool is required")
 	}
-
 	return &OutboxQueue{pool: pool}, nil
 }
 
@@ -37,6 +36,7 @@ WITH due AS (
     SELECT candidate.event_id
     FROM outbox_events AS candidate
     WHERE candidate.delivered_at IS NULL
+      AND candidate.dead_lettered_at IS NULL
       AND candidate.available_at <= $1
       AND (candidate.claimed_until IS NULL OR candidate.claimed_until <= $1)
       AND NOT EXISTS (
@@ -61,9 +61,7 @@ WHERE event.event_id = due.event_id
 RETURNING event.event_id, event.aggregate_type, event.aggregate_id,
           event.aggregate_version, event.event_type, event.payload,
           event.occurred_at, event.claimed_by, event.attempt_count,
-          event.claimed_until`,
-		request.ClaimedAt, request.Limit, request.Token, request.LeaseUntil,
-	)
+          event.claimed_until`, request.ClaimedAt, request.Limit, request.Token, request.LeaseUntil)
 	if err != nil {
 		return nil, fmt.Errorf("claim outbox events: %w", err)
 	}
@@ -73,11 +71,7 @@ RETURNING event.event_id, event.aggregate_type, event.aggregate_id,
 	for rows.Next() {
 		var claim worker.OutboxClaim
 		var payload []byte
-		if err := rows.Scan(
-			&claim.Event.EventID, &claim.Event.AggregateType, &claim.Event.AggregateID,
-			&claim.Event.AggregateVersion, &claim.Event.EventType, &payload,
-			&claim.Event.OccurredAt, &claim.Token, &claim.Attempt, &claim.LeaseUntil,
-		); err != nil {
+		if err := rows.Scan(&claim.Event.EventID, &claim.Event.AggregateType, &claim.Event.AggregateID, &claim.Event.AggregateVersion, &claim.Event.EventType, &payload, &claim.Event.OccurredAt, &claim.Token, &claim.Attempt, &claim.LeaseUntil); err != nil {
 			return nil, fmt.Errorf("scan outbox claim: %w", err)
 		}
 		claim.Event.Payload = json.RawMessage(payload)
@@ -89,7 +83,6 @@ RETURNING event.event_id, event.aggregate_type, event.aggregate_id,
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("read outbox claims: %w", err)
 	}
-
 	return claims, nil
 }
 
@@ -97,7 +90,6 @@ func (queue *OutboxQueue) MarkOutboxDelivered(ctx context.Context, eventID, clai
 	if eventID == "" || claimToken == "" || deliveredAt.IsZero() {
 		return errors.New("event, claim and delivery time are required")
 	}
-
 	command, err := queue.pool.Exec(ctx, `
 UPDATE outbox_events
 SET delivered_at = $3,
@@ -106,6 +98,7 @@ SET delivered_at = $3,
     last_error = NULL
 WHERE event_id = $1
   AND delivered_at IS NULL
+  AND dead_lettered_at IS NULL
   AND claimed_by = $2
   AND claimed_until > clock_timestamp()`, eventID, claimToken, deliveredAt)
 	if err != nil {
@@ -114,7 +107,34 @@ WHERE event_id = $1
 	if command.RowsAffected() != 1 {
 		return worker.ErrOutboxClaimLost
 	}
+	return nil
+}
 
+func (queue *OutboxQueue) MarkOutboxDeadLettered(ctx context.Context, eventID, claimToken string, deadLetteredAt time.Time, reason string) error {
+	if eventID == "" || claimToken == "" || deadLetteredAt.IsZero() || reason == "" {
+		return errors.New("event, claim, dead-letter time and reason are required")
+	}
+	if len([]rune(reason)) > maxOutboxDeliveryError {
+		return errors.New("outbox dead-letter reason exceeds storage limit")
+	}
+	command, err := queue.pool.Exec(ctx, `
+UPDATE outbox_events
+SET dead_lettered_at = $3,
+    dead_letter_reason = $4,
+    claimed_by = NULL,
+    claimed_until = NULL,
+    last_error = $4
+WHERE event_id = $1
+  AND delivered_at IS NULL
+  AND dead_lettered_at IS NULL
+  AND claimed_by = $2
+  AND claimed_until > clock_timestamp()`, eventID, claimToken, deadLetteredAt, reason)
+	if err != nil {
+		return fmt.Errorf("mark outbox event dead-lettered: %w", err)
+	}
+	if command.RowsAffected() != 1 {
+		return worker.ErrOutboxClaimLost
+	}
 	return nil
 }
 
@@ -125,7 +145,6 @@ func (queue *OutboxQueue) ScheduleOutboxRetry(ctx context.Context, eventID, clai
 	if len([]rune(lastError)) > maxOutboxDeliveryError {
 		return errors.New("outbox delivery error exceeds storage limit")
 	}
-
 	command, err := queue.pool.Exec(ctx, `
 UPDATE outbox_events
 SET available_at = $3,
@@ -134,6 +153,7 @@ SET available_at = $3,
     last_error = $4
 WHERE event_id = $1
   AND delivered_at IS NULL
+  AND dead_lettered_at IS NULL
   AND claimed_by = $2
   AND claimed_until > clock_timestamp()`, eventID, claimToken, retryAt, lastError)
 	if err != nil {
@@ -142,7 +162,6 @@ WHERE event_id = $1
 	if command.RowsAffected() != 1 {
 		return worker.ErrOutboxClaimLost
 	}
-
 	return nil
 }
 

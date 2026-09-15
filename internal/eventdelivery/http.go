@@ -25,6 +25,16 @@ type HTTPPublisher struct {
 	client   *http.Client
 }
 
+type PermanentDeliveryError struct {
+	StatusCode int
+}
+
+func (err *PermanentDeliveryError) Error() string {
+	return fmt.Sprintf("delivery endpoint returned permanent HTTP %d", err.StatusCode)
+}
+
+func (err *PermanentDeliveryError) Permanent() bool { return true }
+
 func NewHTTPPublisher(endpoint, token string, timeout time.Duration) (*HTTPPublisher, error) {
 	if err := validateEndpoint(endpoint); err != nil {
 		return nil, err
@@ -73,11 +83,14 @@ func (publisher *HTTPPublisher) Publish(ctx context.Context, event worker.Outbox
 	defer func() { _ = response.Body.Close() }()
 
 	_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, responseDrainLimit))
-	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
-		return fmt.Errorf("delivery endpoint returned HTTP %d", response.StatusCode)
+	if response.StatusCode >= http.StatusOK && response.StatusCode < http.StatusMultipleChoices {
+		return nil
+	}
+	if response.StatusCode == http.StatusRequestTimeout || response.StatusCode == http.StatusTooManyRequests || response.StatusCode >= http.StatusInternalServerError {
+		return fmt.Errorf("delivery endpoint returned retryable HTTP %d", response.StatusCode)
 	}
 
-	return nil
+	return &PermanentDeliveryError{StatusCode: response.StatusCode}
 }
 
 func validateEndpoint(endpoint string) error {
