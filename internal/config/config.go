@@ -11,6 +11,8 @@ import (
 	"time"
 )
 
+const databaseStatementTimeout = 5 * time.Second
+
 type Config struct {
 	HTTPAddr             string
 	DatabaseURL          string
@@ -125,11 +127,20 @@ func Load(getenv func(string) string) (Config, error) {
 	if c.MatchConcurrency > c.MatchBatchSize {
 		return Config{}, errors.New("MATCH_WORKER_CONCURRENCY cannot exceed MATCH_WORKER_BATCH_SIZE")
 	}
+	if c.MatchLease <= databaseStatementTimeout {
+		return Config{}, errors.New("MATCH_WORKER_LEASE must exceed the PostgreSQL statement timeout")
+	}
 	if c.MatchStaleRetryDelay > time.Second {
 		return Config{}, errors.New("MATCH_WORKER_STALE_RETRY_DELAY cannot exceed one second")
 	}
+	if c.RatingLease <= databaseStatementTimeout {
+		return Config{}, errors.New("RATING_WORKER_LEASE must exceed the PostgreSQL statement timeout")
+	}
 	if c.OutboxConcurrency > c.OutboxBatchSize {
 		return Config{}, errors.New("OUTBOX_WORKER_CONCURRENCY cannot exceed OUTBOX_WORKER_BATCH_SIZE")
+	}
+	if c.OutboxLease <= databaseStatementTimeout {
+		return Config{}, errors.New("OUTBOX_WORKER_LEASE must exceed the PostgreSQL statement timeout")
 	}
 	if c.OutboxRequestTimeout >= c.OutboxLease {
 		return Config{}, errors.New("OUTBOX_REQUEST_TIMEOUT must be shorter than OUTBOX_WORKER_LEASE")
