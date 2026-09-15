@@ -129,10 +129,16 @@ database roles, migration order, canaries, and rollback.
 ## Verification
 
 ```bash
-make demo        # disposable PostgreSQL and complete five-player lifecycle
-make check       # tidy, build, race tests, lint
-make security    # reachable Go vulnerability scan
+make demo         # disposable PostgreSQL and complete five-player lifecycle
+make check        # tidy, build, race tests, lint
+make security     # reachable Go vulnerability scan
+make performance  # deterministic algorithm and 10k-ticket simulation benchmarks
 ```
+
+`make performance` records `ns/op`, allocations, and deterministic simulation
+`tickets/s`. The 10,000-ticket workload uses a stable seed and is an engineering
+baseline only; it is not a production RPS or capacity claim. See the
+[performance budget](docs/performance-budget.md) for the measurement policy.
 
 `make demo` requires Docker. It starts a disposable PostgreSQL 18 container on
 an automatically selected loopback port, runs the real application and example
@@ -149,7 +155,8 @@ make release-check
 That gate adds migrations, lifecycle integration, load/recovery/failure
 injection, a complete external canary lifecycle, container build, and non-root
 runtime-user verification. GitHub CI also runs fixed-work fuzzing, architecture
-boundaries, dependency review, and a critical matchmaking benchmark.
+boundaries, dependency review, and the reproducible critical performance profile
+after merges to `main`.
 
 Migration-sensitive changes and a weekly scheduled workflow additionally create
 100,000 representative rows in each primary operational table, make a PostgreSQL
