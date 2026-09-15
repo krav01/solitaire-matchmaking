@@ -1,0 +1,177 @@
+name: Release artifact smoke
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/release-artifact-smoke.yml'
+      - '.release/smoke-image'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/release-artifact-smoke.yml'
+      - '.release/smoke-image'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: read
+
+concurrency:
+  group: release-artifact-smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    name: Smoke published RC image
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_DB: release_smoke
+          POSTGRES_USER: matchmaking
+          POSTGRES_PASSWORD: matchmaking
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U matchmaking -d release_smoke"
+          --health-interval 2s
+          --health-timeout 2s
+          --health-retries 15
+    env:
+      DATABASE_URL: postgres://matchmaking:matchmaking@127.0.0.1:5432/release_smoke?sslmode=disable
+      API_TOKEN: release-smoke-api-token-0123456789abcdef
+      OUTBOX_DELIVERY_TOKEN: release-smoke-outbox-token-0123456789abc
+      HTTP_ADDR: 127.0.0.1:18080
+    steps:
+      - name: Checkout smoke request
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Resolve immutable image
+        id: image
+        shell: bash
+        run: |
+          set -euo pipefail
+          image=$(tr -d '[:space:]' < .release/smoke-image)
+          if [[ ! "${image}" =~ ^ghcr\.io/krav01/solitaire-matchmaking@sha256:[0-9a-f]{64}$ ]]; then
+            echo "::error::Smoke image must be the immutable solitaire-matchmaking GHCR digest"
+            exit 1
+          fi
+          echo "reference=${image}" >> "${GITHUB_OUTPUT}"
+
+      - name: Pull and inspect published image
+        env:
+          IMAGE: ${{ steps.image.outputs.reference }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker pull "${IMAGE}"
+          test "$(docker image inspect --format '{{.Config.User}}' "${IMAGE}")" = "65532:65532"
+          version=$(docker image inspect --format '{{ index .Config.Labels "org.opencontainers.image.version" }}' "${IMAGE}")
+          revision=$(docker image inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "${IMAGE}")
+          requested_version=$(tr -d '[:space:]' < .release/version)
+          test "${version}" = "${requested_version#v}"
+          test "${revision}" = "789031d970066086d530fa1d0379de07a3e909f9"
+
+      - name: Run published migration binary
+        env:
+          IMAGE: ${{ steps.image.outputs.reference }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm \
+            --network host \
+            --read-only \
+            --cap-drop ALL \
+            --security-opt no-new-privileges:true \
+            --entrypoint /migrate \
+            --env DATABASE_URL \
+            "${IMAGE}"
+
+      - name: Start published server
+        env:
+          IMAGE: ${{ steps.image.outputs.reference }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --detach \
+            --name solitaire-release-smoke \
+            --network host \
+            --read-only \
+            --cap-drop ALL \
+            --security-opt no-new-privileges:true \
+            --env DATABASE_URL \
+            --env API_TOKEN \
+            --env HTTP_ADDR \
+            --env OUTBOX_DELIVERY_TOKEN \
+            --env OUTBOX_DELIVERY_URL=http://127.0.0.1:18081/events \
+            "${IMAGE}"
+
+      - name: Probe published server
+        env:
+          IMAGE: ${{ steps.image.outputs.reference }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          base_url="http://${HTTP_ADDR}"
+          ready=0
+          for _ in $(seq 1 40); do
+            if curl --fail --silent --show-error "${base_url}/readyz" >/tmp/ready.json; then
+              ready=1
+              break
+            fi
+            sleep 0.25
+          done
+          if [[ "${ready}" != "1" ]]; then
+            echo "::error::Published server did not become ready"
+            exit 1
+          fi
+
+          curl --fail --silent --show-error "${base_url}/healthz" | grep -q '"status":"ok"'
+          curl --fail --silent --show-error \
+            --header "Authorization: Bearer ${API_TOKEN}" \
+            "${base_url}/v1/capabilities" | grep -q '"outbox_delivery_enabled":true'
+          curl --fail --silent --show-error \
+            --header "Authorization: Bearer ${API_TOKEN}" \
+            "${base_url}/metrics" | grep -q 'solitaire_matchmaking_'
+
+          unauthenticated_status=$(curl --silent --output /dev/null --write-out '%{http_code}' \
+            "${base_url}/v1/capabilities")
+          test "${unauthenticated_status}" = "401"
+
+          {
+            echo "# Published release artifact smoke"
+            echo
+            echo "- Result: PASS"
+            echo "- Image: \`${IMAGE}\`"
+            echo "- Runtime user: \`65532:65532\`"
+            echo "- Migration binary: PASS"
+            echo "- Hardened read-only server startup: PASS"
+            echo "- Health/readiness: PASS"
+            echo "- Authenticated capabilities/metrics: PASS"
+            echo "- Unauthenticated API rejection: PASS"
+          } | tee release-artifact-smoke.md
+
+      - name: Collect server logs
+        if: always()
+        shell: bash
+        run: docker logs solitaire-release-smoke > release-artifact-smoke.log 2>&1 || true
+
+      - name: Stop published server
+        if: always()
+        shell: bash
+        run: docker rm --force solitaire-release-smoke >/dev/null 2>&1 || true
+
+      - name: Upload smoke evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-artifact-smoke-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            release-artifact-smoke.md
+            release-artifact-smoke.log
+          if-no-files-found: warn
+          retention-days: 30
