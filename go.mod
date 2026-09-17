@@ -2,7 +2,7 @@ module github.com/krav01/solitaire-matchmaking
 
 go 1.26.6
 
-require github.com/jackc/pgx/v5 v5.10.0
+require github.com/jackc/pgx/v5 v5.11.0
 
 require (
 	github.com/prometheus/client_golang v1.24.1
