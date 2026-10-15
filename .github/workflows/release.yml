@@ -105,7 +105,7 @@ jobs:
         shell: bash
         run: cat "${REHEARSAL_REPORT}" >> "${GITHUB_STEP_SUMMARY}"
       - name: Upload rehearsal evidence
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: backup-restore-rehearsal-${{ steps.identity.outputs.release_tag }}
           path: backup-restore-rehearsal.md
@@ -192,7 +192,7 @@ jobs:
           exit-code: '1'
           version: v0.70.0
       - name: Generate release SBOM
-        uses: anchore/sbom-action@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26 # v0.24.2
+        uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
         with:
           image: ${{ steps.image.outputs.reference }}
           format: spdx-json
@@ -211,7 +211,7 @@ jobs:
             solitaire-matchmaking.spdx.json \
             > release-artifacts.sha256
       - name: Upload verified release inputs
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: solitaire-matchmaking-${{ needs.validate.outputs.release_tag }}-release-inputs
           path: |
@@ -236,7 +236,7 @@ jobs:
       IMAGE_REPOSITORY: ${{ needs.verify_image.outputs.repository }}
     steps:
       - name: Download verified release inputs
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: solitaire-matchmaking-${{ needs.validate.outputs.release_tag }}-release-inputs
       - name: Verify and load release image
